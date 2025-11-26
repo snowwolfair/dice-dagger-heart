@@ -2,6 +2,6 @@
 
 [![npm](https://img.shields.io/npm/v/koishi-plugin-dice-dagger-heart?style=flat-square)](https://www.npmjs.com/package/koishi-plugin-dice-dagger-heart)
 
-English | [中文](README_zh.md)
+[English](README.md) | 中文
 
-DaggerHeart game use
+游玩匕首之心时的骰子
