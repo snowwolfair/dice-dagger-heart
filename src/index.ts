@@ -21,12 +21,10 @@ export const usage = `
 
 <p>目前仅测试了 <b>Onebot</b> 协议</p>
 
-<p>仓库地址：<a href="https://github.com/snowwolfair/daynew">https://github.com/snowwolfair/daynew</a></p>
+<p>仓库地址：<a href="https://github.com/snowwolfair/dice-dagger-heart">https://github.com/snowwolfair/dice-dagger-heart</a></p>
 
-<p style="color: #f39c12;">插件使用问题 / Bug反馈 请发 issue</p>
+<p style="color: #f39c12;">插件使用问题 / Bug反馈 / 建议 请 添加企鹅群 156529412 或在仓库中发 issue </p>
 
-
-<h2>食用方法</h2>
 `;
 export async function apply(ctx: Context, config) {
   // createFieldTable(ctx);
