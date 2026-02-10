@@ -1,6 +1,6 @@
 {
   "name": "@mashroomwolf/koishi-plugin-dice-dagger-heart",
-  "description": "",
+  "description": "dice-dagger-heart bot (including dice rolling)",
   "version": "0.0.1",
   "main": "lib/index.js",
   "typings": "lib/index.d.ts",
@@ -13,10 +13,30 @@
   "keywords": [
     "chatbot",
     "koishi",
-    "plugin"
+    "plugin",
+    "dice",
+    "daggerheart"
   ],
   "devDependencies": {},
   "peerDependencies": {
     "koishi": "^4.18.7"
+  },
+  "koishi": {
+    "description": {
+      "en": "dice-dagger-heart",
+      "zh": "匕首之心bot(包含人物卡创建和掷骰)"
+    },
+    "service": {
+      "required": [
+        "database",
+        "puppeteer",
+        "http"
+      ],
+      "optional": [
+        "adapter-onebot"
+      ]
+    },
+    "preview": true,
+    "browser": true
   }
 }
