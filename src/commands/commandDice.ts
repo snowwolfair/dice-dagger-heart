@@ -1,7 +1,22 @@
 import { Context, $, Session } from "koishi";
+import { Config } from "../config";
 
-export function commandDice(ctx: Context, config) {
+export function commandDice(ctx: Context, config: Config) {
   ctx.command("r [values] 掷骰子").action(async ({ session }, values) => {
+    if (!session) return "无法获取用户信息。";
+
+    if (!values) {
+      const roll = Math.floor(Math.random() * 6) + 1;
+      session.send(
+        `${session.event.user.name} 掷出了它的命运，结果会是什么呢\n${roll}`,
+      );
+      return;
+    }
+
+    nomalRollResult(values, session);
+  });
+
+  ctx.command("st [values] 设置属性").action(async ({ session }, values) => {
     if (!session) return "无法获取用户信息。";
 
     if (!values) {
@@ -110,7 +125,7 @@ export function commandDice(ctx: Context, config) {
       const rest = session.content.slice(prefixMatch[0].length).trimStart();
 
       // 3. 调用结果方程
-      rollResult(rest, despair, hope, session, result);
+      rollResult(rest, despair, hope, session, result, config);
     }
     if (prefixMatchR) {
       // 2. 提取前缀后的剩余字符串，并去除首尾空白
@@ -168,6 +183,7 @@ function rollResult(
   hope: number,
   session: Session,
   result: number,
+  config: Config,
 ) {
   if (rest === "") {
     if (hope > despair) {
@@ -177,7 +193,7 @@ function rollResult(
 希望骰 ${hope}       与        恐惧骰 ${despair} \n
 -------------------------------------------\n
 合计 ${result}         希望结果\n
-${hopeful()}      `,
+${hopeful(config)}      `,
       );
     } else if (hope < despair) {
       session.send(
@@ -186,7 +202,7 @@ ${hopeful()}      `,
 希望骰 ${hope}       与        恐惧骰 ${despair} \n
 -------------------------------------------\n
 合计 ${result}         恐惧结果\n
-${desperate()}      `,
+${desperate(config)}      `,
       );
     } else {
       session.send(
@@ -195,7 +211,7 @@ ${desperate()}      `,
 希望骰 ${hope}        与        恐惧骰 ${despair} \n
 -------------------------------------------\n
             关键成功！\n
-${wonderful()}      `,
+${wonderful(config)}      `,
       );
     }
   } else {
@@ -249,7 +265,7 @@ ${wonderful()}      `,
 希望骰 ${hope}       与        恐惧骰 ${despair} \n
 -------------------------------------------\n
 调整值: ${adjustments.join(",")}       合计 ${result + total}       希望结果\n
-${hopeful()}      `,
+${hopeful(config)}      `,
       );
     } else if (hope < despair) {
       session.send(
@@ -258,7 +274,7 @@ ${hopeful()}      `,
 希望骰 ${hope}       与        恐惧骰 ${despair} \n
 -------------------------------------------\n
 调整值: ${adjustments.join(",")}       合计 ${result + total}       恐惧结果\n
-${desperate()}      `,
+${desperate(config)}      `,
       );
     } else {
       session.send(
@@ -267,10 +283,11 @@ ${desperate()}      `,
 希望骰 ${hope}       与        恐惧骰 ${despair} \n
 -------------------------------------------\n
            关键成功！\n
-${wonderful()}      `,
+${wonderful(config)}      `,
       );
     }
   }
+  console.log(config);
 }
 
 function nomalRollResult(values: string, session: Session) {
@@ -327,21 +344,37 @@ function nomalRollResult(values: string, session: Session) {
 }
 
 // 希望结果
-function hopeful() {
-  return hopefuljson[Math.floor(Math.random() * hopefuljson.length)];
+function hopeful(config: Config) {
+  if (config.hopeResultText.length === 0) {
+    return "";
+  } else {
+    return config.hopeResultText[
+      Math.floor(Math.random() * config.hopeResultText.length)
+    ];
+  }
 }
 
 // 恐惧结果
-function desperate() {
-  return desperatejson[Math.floor(Math.random() * desperatejson.length)];
+function desperate(config: Config) {
+  if (config.despairResultText.length === 0) {
+    return "";
+  } else {
+    return config.despairResultText[
+      Math.floor(Math.random() * config.despairResultText.length)
+    ];
+  }
 }
 
 // 关键成功结果
-function wonderful() {
-  return wonderfuljson[Math.floor(Math.random() * wonderfuljson.length)];
+function wonderful(config: Config) {
+  if (config.wonderfulResultText.length === 0) {
+    return "";
+  } else {
+    return config.wonderfulResultText[
+      Math.floor(Math.random() * config.wonderfulResultText.length)
+    ];
+  }
 }
-
-
 
 let hopefuljson = [
   "黎明时的第一束阳光，前方的道路正是希望",
@@ -364,6 +397,7 @@ let wonderfuljson = [
   "命运的纺车为你编制华衣",
   "命运女神亲吻了你的脸颊",
   "此即命定之时，英雄即将出现",
+  "制胜的一击",
 ];
 
 // 获取玩家名
