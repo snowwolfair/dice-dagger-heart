@@ -12,21 +12,6 @@ export function commandDice(ctx: Context, config: Config) {
       );
       return;
     }
-
-    nomalRollResult(values, session);
-  });
-
-  ctx.command("st [values] 设置属性").action(async ({ session }, values) => {
-    if (!session) return "无法获取用户信息。";
-
-    if (!values) {
-      const roll = Math.floor(Math.random() * 6) + 1;
-      session.send(
-        `${session.event.user.name} 掷出了它的命运，结果会是什么呢\n${roll}`,
-      );
-      return;
-    }
-
     nomalRollResult(values, session);
   });
 
@@ -188,30 +173,15 @@ function rollResult(
   if (rest === "") {
     if (hope > despair) {
       session.send(
-        `${session.event.user.name} 掷出了它的命运，结果会是什么呢\n
---------------------------------------------\n
-希望骰 ${hope}       与        恐惧骰 ${despair} \n
--------------------------------------------\n
-合计 ${result}         希望结果\n
-${hopeful(config)}      `,
+        `${session.event.user.name} 掷出了它的命运，结果会是什么呢\n--------------------------------------------\n希望骰 ${hope}       与        恐惧骰 ${despair}\n-------------------------------------------\n合计 ${result}         希望结果\n${hopeful(config)}      `,
       );
     } else if (hope < despair) {
       session.send(
-        `${session.event.user.name} 掷出了它的命运，结果会是什么呢\n
---------------------------------------------\n
-希望骰 ${hope}       与        恐惧骰 ${despair} \n
--------------------------------------------\n
-合计 ${result}         恐惧结果\n
-${desperate(config)}      `,
+        `${session.event.user.name} 掷出了它的命运，结果会是什么呢\n--------------------------------------------\n希望骰 ${hope}       与        恐惧骰 ${despair}\n-------------------------------------------\n合计 ${result}         恐惧结果\n${desperate(config)}      `,
       );
     } else {
       session.send(
-        `${session.event.user.name} 掷出了它的命运，结果会是什么呢\n
---------------------------------------------\n
-希望骰 ${hope}        与        恐惧骰 ${despair} \n
--------------------------------------------\n
-            关键成功！\n
-${wonderful(config)}      `,
+        `${session.event.user.name} 掷出了它的命运，结果会是什么呢\n--------------------------------------------\n希望骰 ${hope}        与        恐惧骰 ${despair} \n-------------------------------------------\n            关键成功！\n${wonderful(config)}      `,
       );
     }
   } else {
@@ -260,30 +230,15 @@ ${wonderful(config)}      `,
 
     if (hope > despair) {
       session.send(
-        `${session.event.user.name} 掷出了它的命运，结果会是什么呢\n
---------------------------------------------\n
-希望骰 ${hope}       与        恐惧骰 ${despair} \n
--------------------------------------------\n
-调整值: ${adjustments.join(",")}       合计 ${result + total}       希望结果\n
-${hopeful(config)}      `,
+        `${session.event.user.name} 掷出了它的命运，结果会是什么呢\n--------------------------------------------\n希望骰 ${hope}       与        恐惧骰 ${despair}\n-------------------------------------------\n调整值: ${adjustments.join(",")}       合计 ${result + total}       希望结果\n${hopeful(config)}      `,
       );
     } else if (hope < despair) {
       session.send(
-        `${session.event.user.name} 掷出了它的命运，结果会是什么呢\n
---------------------------------------------\n
-希望骰 ${hope}       与        恐惧骰 ${despair} \n
--------------------------------------------\n
-调整值: ${adjustments.join(",")}       合计 ${result + total}       恐惧结果\n
-${desperate(config)}      `,
+        `${session.event.user.name} 掷出了它的命运，结果会是什么呢\n--------------------------------------------\n希望骰 ${hope}       与        恐惧骰 ${despair}\n-------------------------------------------\n调整值: ${adjustments.join(",")}       合计 ${result + total}       恐惧结果\n${desperate(config)}      `,
       );
     } else {
       session.send(
-        `${session.event.user.name} 掷出了它的命运，结果会是什么呢\n
---------------------------------------------\n
-希望骰 ${hope}       与        恐惧骰 ${despair} \n
--------------------------------------------\n
-           关键成功！\n
-${wonderful(config)}      `,
+        `${session.event.user.name} 掷出了它的命运，结果会是什么呢\n--------------------------------------------\n希望骰 ${hope}       与        恐惧骰 ${despair}\n-------------------------------------------\n           关键成功！\n${wonderful(config)}      `,
       );
     }
   }

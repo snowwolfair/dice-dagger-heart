@@ -1,11 +1,48 @@
-// import { Context } from "koishi";
+import { Context } from "koishi";
 
-// declare module "koishi" {
-//   interface Tables {
-//     character: Character;
-//     field: Field;
-//   }
-// }
+declare module "koishi" {
+  interface Tables {
+    playercharacter: playerCharacter;
+    // character: Character;
+    // field: Field;
+  }
+}
+
+export interface playerCharacter {
+  id: number;
+  useable: boolean;
+  userid: string;
+  groupid: string;
+  username: string;
+  rolename: string;
+  property: {
+    agility: number;
+    strength: number;
+    finesse: number;
+    instinct: number;
+    presence: number;
+    knowledge: number;
+  };
+  armor: {
+    value: number;
+    max: number;
+  };
+  hp: {
+    value: number;
+    max: number;
+  };
+  stress: {
+    value: number;
+    max: number;
+  };
+  hope: {
+    value: number;
+    max: number;
+  };
+  major: number;
+  severe: number;
+  experience: string;
+}
 
 // // 角色卡表
 // export interface Character {
@@ -73,6 +110,70 @@
 //   type: string;
 //   characteristic: string[];
 // }
+
+export async function createPlayerCharacterTable(ctx: Context) {
+  ctx.model.extend(
+    "playercharacter",
+    {
+      id: "unsigned",
+      useable: {
+        type: "boolean",
+        initial: false,
+        nullable: false,
+      },
+      userid: "string",
+      username: "string",
+      groupid: "string",
+      rolename: "string",
+      "property.agility": "integer",
+      "property.strength": "integer",
+      "property.finesse": "integer",
+      "property.instinct": "integer",
+      "property.presence": "integer",
+      "property.knowledge": "integer",
+      "armor.value": "integer",
+      "armor.max": "integer",
+      "hp.value": {
+        type: "integer",
+        initial: 0,
+        nullable: false,
+      },
+      "hp.max": {
+        type: "integer",
+        initial: 6,
+        nullable: false,
+      },
+      "stress.value": {
+        type: "integer",
+        initial: 0,
+        nullable: false,
+      },
+      "stress.max": {
+        type: "integer",
+        initial: 6,
+        nullable: false,
+      },
+      "hope.value": {
+        type: "integer",
+        initial: 2,
+        nullable: false,
+      },
+      "hope.max": {
+        type: "integer",
+        initial: 6,
+        nullable: false,
+      },
+      major: "integer",
+      severe: "integer",
+      experience: {
+        type: "string",
+        initial: "",
+        nullable: false,
+      },
+    },
+    { autoInc: true },
+  );
+}
 
 // export async function createFieldTable(ctx: Context) {
 //   ctx.model.extend("field", {

@@ -1,10 +1,12 @@
 import { Context, Database, Schema, $, z } from "koishi";
 // import { Character, Field } from "./database";
 // import { createCharacterTable, createFieldTable } from "./database";
-// import { commandCreateRole } from "./commands/commandCreateRole";
+import {} from "koishi-plugin-adapter-onebot";
+import { createPlayerCharacterTable } from "./database";
 import { DataService } from "@koishijs/plugin-console";
 import { resolve } from "path";
 import { commandDice } from "./commands/commandDice";
+import { setRole } from "./commands/commandCreateRole";
 // import { Config } from "./config";
 
 export const name = "dice-dagger-heart";
@@ -67,6 +69,8 @@ export async function apply(ctx: Context, config: Config) {
   // createFieldTable(ctx);
   // createCharacterTable(ctx);
   // commandCreateRole(ctx);
+  setRole(ctx);
+  createPlayerCharacterTable(ctx);
   commandDice(ctx, config);
 
   // ctx.plugin(CustomProvider);
