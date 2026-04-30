@@ -17,3 +17,8 @@ export const Property_Dict = {
   重伤阈值: "major",
   严重阈值: "severe",
 };
+
+export const PRO_CON_Dict = {
+  优势: "+1d6",
+  劣势: "-1d6",
+};

@@ -16,13 +16,30 @@ export function setRole(ctx: Context) {
     const user = session.event.user;
     const groupId = session.guildId;
 
+    if (!name) {
+      session.send("请输入角色名称");
+      return;
+    }
+
     const characterExist = await ctx.database
+      .select("playercharacter")
+      .where((row) => $.eq(row.userid, user.id))
+      .where((row) => $.eq(row.groupid, groupId))
+      .where((row) => $.eq(row.rolename, name))
+      .execute();
+    if (characterExist.length > 0) {
+      session.send(`角色${name}已存在,已自动切换到对应角色`);
+      await switchRoles(ctx, session, name);
+      return;
+    }
+
+    const characterUseable = await ctx.database
       .select("playercharacter")
       .where((row) => $.eq(row.userid, user.id))
       .where((row) => $.eq(row.groupid, groupId))
       .where((row) => $.eq(row.useable, true))
       .execute();
-    if (characterExist.length > 0) {
+    if (characterUseable.length > 0) {
       await ctx.database.set(
         "playercharacter",
         {
@@ -41,6 +58,33 @@ export function setRole(ctx: Context) {
       groupid: groupId,
       useable: true,
       rolename: name,
+      property: {
+        agility: 0,
+        strength: 0,
+        finesse: 0,
+        instinct: 0,
+        presence: 0,
+        knowledge: 0,
+      },
+      armor: {
+        value: 0,
+        max: 0,
+      },
+      hp: {
+        value: 0,
+        max: 0,
+      },
+      stress: {
+        value: 0,
+        max: 0,
+      },
+      hope: {
+        value: 0,
+        max: 0,
+      },
+      major: 0,
+      severe: 0,
+      experience: "",
     });
     session.send(`新人登场！${name}进入了这幕舞台`);
   });
@@ -48,54 +92,29 @@ export function setRole(ctx: Context) {
   // 切换当前登场角色
   ctx
     .command("pcswitch [name] 切换当前登场角色")
+    .alias("pccg")
     .action(async ({ session }, name) => {
       if (!session) return "无法获取用户信息。";
       console.log(session.event.user, session.user);
       const user = session.event.user;
+      const avatar = user?.avatar ?? "";
       const groupId = session.guildId;
-
-      await ctx.database.set(
-        "playercharacter",
-        {
-          userid: user.id,
-          groupid: groupId,
-        },
-        {
-          useable: false,
-        },
-      );
-
-      const characterExist = await ctx.database
-        .select("playercharacter")
-        .where((row) => $.eq(row.userid, user.id))
-        .where((row) => $.eq(row.groupid, groupId))
-        .where((row) => $.eq(row.rolename, name))
-        .execute();
-      if (characterExist.length == 0) {
-        session.send(`这幕舞台中，[${name}] 还未曾登场`);
+      if (!name) {
+        session.send("请输入切换角色名称");
         return;
-      } else {
-        await ctx.database.set(
-          "playercharacter",
-          {
-            userid: user.id,
-            rolename: name,
-            groupid: groupId,
-          },
-          {
-            useable: true,
-          },
-        );
-        session.send(`现在登场的角色是：${name}`);
       }
+      await switchRoles(ctx, session, name);
     });
 
   // 设置属性
-  ctx
-    .command("st [properties] 设置属性")
-    .action(async ({ session }, properties) => {
-      if (!session) return "无法获取用户信息。";
-      console.log(session.event.user, session.user);
+  ctx.middleware(async (session, next) => {
+    if (!session) return "无法获取用户信息。";
+    const prefixMatch = session.content.match(/^([。\.]st)/i);
+    if (prefixMatch) {
+      // 2. 提取前缀后的剩余字符串，并去除首尾空白
+      const rest = session.content.slice(prefixMatch[0].length).trimStart();
+
+      // 3. 调用结果方程
       const user = session.event.user;
       const groupId = session.guildId;
 
@@ -111,17 +130,20 @@ export function setRole(ctx: Context) {
       }
 
       const result: any = {
-        experience: [],
+        experience: JSON.parse(character[0].experience || "[]") || [],
       };
-      const regex = /([^\d=-]+?)(-?\d+)/g;
+      const regex = /([^\d=-]+?)([-+]?\d+)/g;
       let match;
 
-      while ((match = regex.exec(properties)) !== null) {
+      while ((match = regex.exec(rest)) !== null) {
         let rawKey = match[1].trim();
         const value = parseInt(match[2], 10); // 属性值，如 1
         if (Property_Dict[rawKey]) {
           result[Property_Dict[rawKey]] = value;
         } else {
+          if (rawKey == "恐惧" || rawKey == "恐惧上限") {
+            continue;
+          }
           // 3. 存入 experience
           result.experience.push({
             key: rawKey,
@@ -141,33 +163,188 @@ export function setRole(ctx: Context) {
         },
         {
           username: user.name,
-          "property.agility": result.agility,
-          "property.strength": result.strength,
-          "property.finesse": result.finesse,
-          "property.instinct": result.instinct,
-          "property.presence": result.presence,
-          "property.knowledge": result.knowledge,
+          "property.agility": $.add(
+            character[0].property.agility,
+            result.agility || 0,
+          ),
+          "property.strength": $.add(
+            character[0].property.strength,
+            result.strength || 0,
+          ),
+          "property.finesse": $.add(
+            character[0].property.finesse,
+            result.finesse || 0,
+          ),
+          "property.instinct": $.add(
+            character[0].property.instinct,
+            result.instinct || 0,
+          ),
+          "property.presence": $.add(
+            character[0].property.presence,
+            result.presence || 0,
+          ),
+          "property.knowledge": $.add(
+            character[0].property.knowledge,
+            result.knowledge || 0,
+          ),
 
-          "armor.value": result.armor,
-          "armor.max": result.armor_max,
-          "hp.value": result.health,
-          "hp.max": result.health_max,
+          "armor.value": $.add(character[0].armor.value, result.armor || 0),
+          "armor.max": $.add(character[0].armor.max, result.armor_max || 0),
+          "hp.value": $.add(character[0].hp.value, result.health || 0),
+          "hp.max": $.add(character[0].hp.max, result.health_max || 0),
 
-          "stress.value": result.stress,
-          "stress.max": result.stress_max,
+          "stress.value": $.add(character[0].stress.value, result.stress || 0),
+          "stress.max": $.add(character[0].stress.max, result.stress_max || 0),
 
-          "hope.value": result.hope,
-          "hope.max": result.hope_max,
+          "hope.value": $.add(character[0].hope.value, result.hope || 0),
+          "hope.max": $.add(character[0].hope.max, result.hope_max || 0),
+          major: $.add(character[0].major, result.major || 0),
+          severe: $.add(character[0].severe, result.severe || 0),
           experience: jsonString,
         },
       );
       session.send(`[${character[0].rolename}] 设置属性成功`);
+      const nowRole = await ctx.database
+        .select("playercharacter")
+        .where((row) => $.eq(row.userid, user.id))
+        .where((row) => $.eq(row.groupid, groupId))
+        .where((row) => $.eq(row.useable, true))
+        .execute();
+
+      const cardName = `${nowRole[0].rolename} 希望${nowRole[0].hope.value}/${nowRole[0].hope.max} 生命${nowRole[0].hp.value}/${nowRole[0].hp.max} 压力${nowRole[0].stress.value}/${nowRole[0].stress.max}`;
+      console.log(cardName);
 
       if (session.platform == "onebot") {
-        const cardName = `${character[0].rolename} ${character[0].hope.value}/${character[0].hope.max} ${character[0].hp.value}/${character[0].hp.max} ${character[0].stress.value}/${character[0].stress.max}`;
+        const cardName = `${nowRole[0].rolename} 希望${nowRole[0].hope.value}/${nowRole[0].hope.max} 生命${nowRole[0].hp.value}/${nowRole[0].hp.max} 压力${nowRole[0].stress.value}/${nowRole[0].stress.max}`;
         session.onebot.setGroupCard(groupId, user.id, cardName);
       }
+    }
+    return next();
+  });
+
+  ctx.command("pclist 列出所有角色").action(async ({ session }) => {
+    if (!session) return "无法获取用户信息。";
+    console.log(session.event.user, session.user);
+    const user = session.event.user;
+    const groupId = session.guildId;
+
+    const characterExist = await ctx.database
+      .select("playercharacter")
+      .where((row) => $.eq(row.userid, user.id))
+      .where((row) => $.eq(row.groupid, groupId))
+      .execute();
+    if (characterExist.length > 0) {
+      const characterList = characterExist.map((row) => {
+        if (row.useable == true) {
+          return `${row.rolename}(登场中)`;
+        } else {
+          return `${row.rolename}`;
+        }
+      });
+      session.send(`你这一幕舞台中登场过的角色有：${characterList.join(", ")}`);
+    } else {
+      session.send(`你这一幕舞台中没有登场的角色`);
+    }
+  });
+
+  ctx
+    .command("pcremove [name] 移除登场角色")
+    .alias("pcmv")
+    .action(async ({ session }, name) => {
+      if (!session) return "无法获取用户信息。";
+      console.log(session.event.user, session.user);
+      const user = session.event.user;
+      const groupId = session.guildId;
+      if (!name) {
+        session.send("请输入角色名称");
+        return;
+      }
+      const characterRemoveNow = await ctx.database.remove("playercharacter", {
+        userid: user.id,
+        groupid: groupId,
+        useable: true,
+        rolename: name,
+      });
+      if (!characterRemoveNow.matched) {
+        const characterRemove = await ctx.database.remove("playercharacter", {
+          userid: user.id,
+          groupid: groupId,
+          rolename: name,
+        });
+        if (!characterRemove.matched) {
+          session.send(`${name} 不存在`);
+          return;
+        }
+      } else {
+        if (session.platform == "onebot") {
+          const cardName = `${user.name}`;
+          await session.onebot.setGroupCard(groupId, user.id, cardName);
+        }
+      }
+      session.send(`${name} 在舞台上谢幕了`);
     });
+
+  ctx
+    .command("pcshow [name] 显示当前登场角色属性")
+    .action(async ({ session }, name) => {
+      if (!session) return "无法获取用户信息。";
+      console.log(session.event.user, session.user);
+      const user = session.event.user;
+      const groupId = session.guildId;
+
+      const character = await ctx.database
+        .select("playercharacter")
+        .where((row) => $.eq(row.userid, user.id))
+        .where((row) => $.eq(row.groupid, groupId))
+        .where((row) => $.eq(row.rolename, name))
+        .execute();
+      if (character.length == 0) {
+        session.send(`${name || "角色"} 不存在`);
+        return;
+      }
+      session.send(
+        `[${character[0].rolename}] 属性如下：${JSON.stringify(character[0])}`,
+      );
+    });
+}
+
+async function switchRoles(ctx: Context, session: any, name: string) {
+  const user = session.event.user;
+  const groupId = session.guildId;
+
+  const characterExist = await ctx.database
+    .select("playercharacter")
+    .where((row) => $.eq(row.userid, user.id))
+    .where((row) => $.eq(row.groupid, groupId))
+    .where((row) => $.eq(row.rolename, name))
+    .execute();
+  if (characterExist.length == 0) {
+    session.send(`这幕舞台中，[${name}] 还未曾登场`);
+    return;
+  } else {
+    await ctx.database.set(
+      "playercharacter",
+      {
+        userid: user.id,
+        groupid: groupId,
+      },
+      {
+        useable: false,
+      },
+    );
+    await ctx.database.set(
+      "playercharacter",
+      {
+        userid: user.id,
+        rolename: name,
+        groupid: groupId,
+      },
+      {
+        useable: true,
+      },
+    );
+    session.send(`现在登场的角色是：${name}`);
+  }
 }
 
 // export function commandCreateRole(ctx: Context) {

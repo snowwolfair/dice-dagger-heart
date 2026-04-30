@@ -2,16 +2,20 @@ import { Context, Database, Schema, $, z } from "koishi";
 // import { Character, Field } from "./database";
 // import { createCharacterTable, createFieldTable } from "./database";
 import {} from "koishi-plugin-adapter-onebot";
-import { createPlayerCharacterTable } from "./database";
+import { createPlayerCharacterTable } from "./utiles/database";
 import { DataService } from "@koishijs/plugin-console";
 import { resolve } from "path";
 import { commandDice } from "./commands/commandDice";
 import { setRole } from "./commands/commandCreateRole";
+import { setBoard } from "./commands/commandBoard";
 // import { Config } from "./config";
 
 export const name = "dice-dagger-heart";
 
-export const inject = ["database", "console"];
+export const inject = {
+  required: ["database"],
+  optional: ["console", "puppeteer"],
+};
 
 // declare module "koishi" {
 //   interface Tables {
@@ -69,6 +73,7 @@ export async function apply(ctx: Context, config: Config) {
   // createFieldTable(ctx);
   // createCharacterTable(ctx);
   // commandCreateRole(ctx);
+  setBoard(ctx);
   setRole(ctx);
   createPlayerCharacterTable(ctx);
   commandDice(ctx, config);

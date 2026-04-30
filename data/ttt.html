@@ -1,0 +1,311 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>角色状态卡</title>
+    <style>
+      :root {
+        --border-color: #333;
+        --bg-color: #f9f9f9;
+        --font-family: "Courier New", Courier, monospace;
+      }
+
+      body {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 100vh;
+        margin: 0;
+        background-color: #e0e0e0;
+        font-family: var(--font-family);
+      }
+
+      /* 主容器 - 模拟纸张/卡片 */
+      .card {
+        background-color: white;
+        width: 500px;
+        height: 100%;
+        padding: 20px;
+        border: 2px solid var(--border-color);
+        border-radius: 15px;
+        box-shadow: 5px 5px 15px rgba(0, 0, 0, 0.1);
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+      }
+
+      /* 顶部区域：头像和名字 */
+      .header {
+        display: flex;
+        gap: 15px;
+        align-items: center;
+      }
+
+      .avatar {
+        width: 80px;
+        height: 80px;
+        border: 1px solid var(--border-color);
+        border-radius: 50%;
+        flex-shrink: 0;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+      }
+
+      .name-input {
+        flex-grow: 1;
+        height: 40px;
+        border: 1px solid var(--border-color);
+        border-radius: 5px;
+        text-align: center;
+        font-size: 1.2rem;
+        line-height: 40px;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+      }
+
+      /* 中间网格区域 */
+      .mid-section {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr 1fr;
+        grid-template-rows: auto auto;
+        gap: 10px;
+      }
+
+      .box {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        border: 1px solid var(--border-color);
+        border-radius: 4px;
+        background-color: var(--bg-color);
+        align-items: center;
+      }
+
+      .box-inner-label {
+        display: flex;
+        width: 100%;
+        margin: 5px;
+        padding: 5px 0px;
+        border-bottom: 1px solid var(--border-color);
+        justify-content: center;
+      }
+
+      .box-inner-value {
+        height: 70%;
+        display: flex;
+        width: 100%;
+        justify-content: center;
+        align-items: center;
+        font-size: 32px;
+        font-weight: bold;
+      }
+
+      /* 左侧和中间的6个小方框 */
+      .small-box {
+        height: 80px;
+        grid-column: span 1;
+      }
+
+      /* 右侧的大竖条方框 */
+      .tall-box {
+        grid-row: span 2;
+        height: 170px; /* 2个小框高度 + gap */
+      }
+
+      /* 伤害区域 */
+      .damage-section {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .damage-row {
+        overflow: hidden;
+        width: 80%;
+        height: 30px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        border: 1px solid var(--border-color);
+        border-radius: 4px;
+        background-color: var(--bg-color);
+      }
+
+      .damage-box {
+        text-align: center;
+        font-size: 14px;
+      }
+
+      /* 文字框占据更多空间 */
+      .text-box {
+        font-weight: bold;
+        flex-grow: 8; /* 增长系数为 3 */
+      }
+
+      /* 数字框占据较少空间 */
+      .number-box {
+        flex: 0 0 40px;
+        height: 40px;
+        border: 1px solid var(--border-color);
+        border-radius: 50%;
+        line-height: 38px; /* 可选：让数字在圆形内垂直居中 (高度 - 边框) */
+        /* flex-grow: 1; */
+      }
+
+      /* 底部状态区域 (HP, Hope, Stress) */
+      .status-section {
+        display: flex;
+        justify-content: space-between;
+        padding: 0 10px;
+      }
+
+      .status-column {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        width: 30%;
+      }
+
+      .label {
+        margin-bottom: 8px;
+        font-weight: bold;
+        text-transform: lowercase;
+      }
+
+      .checkbox-row {
+        gap: 5px;
+        margin-bottom: 4px;
+        flex-wrap: wrap;
+        justify-content: center;
+        display: grid;
+        /* 核心代码：重复 3 列，每列宽度固定为 12px */
+        grid-template-columns: repeat(6, 12px);
+      }
+
+      .checkbox-hope {
+        gap: 5px;
+        margin-bottom: 4px;
+        flex-wrap: wrap;
+        justify-content: center;
+        display: grid;
+        /* 核心代码：重复 3 列，每列宽度固定为 12px */
+        grid-template-columns: repeat(3, 12px);
+      }
+
+      .checkbox {
+        width: 12px;
+        height: 12px;
+        border: 1px solid var(--border-color);
+        display: inline-block;
+      }
+
+      .checkbox-checked {
+        background-color: var(--border-color);
+      }
+
+      /* 经历区域 */
+      .experience-section {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        margin-top: 10px;
+        padding-top: 10px;
+        border-top: 1px dashed #ccc;
+      }
+
+      .exp-title {
+        align-self: center;
+        font-weight: bold;
+        text-transform: lowercase;
+        margin-bottom: 5px;
+      }
+
+      .exp-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 15px;
+      }
+
+      .line {
+        flex-grow: 1;
+        border-bottom: 1px solid var(--border-color);
+        height: 20px;
+        margin-right: 10px;
+      }
+
+      .square-check {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 16px;
+        height: 16px;
+        border: 1px solid var(--border-color);
+        flex-shrink: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="card" class="card">
+      <!-- 顶部：头像与名字 -->
+      <div class="header">{{CHARACTER_NAME}}</div>
+
+      <!-- 中间：属性框 -->
+      <div class="mid-section">{{PROPERTY_ITEMS}}</div>
+
+      <!-- 伤害阈值 -->
+      <div class="damage-section">
+        <div class="damage-row">
+          <div class="damage-box text-box">轻度</div>
+          {{DAMAGE_MAJOR}}
+          <div class="damage-box text-box">重度</div>
+          {{DAMAGE_SEVERE}}
+          <div class="damage-box text-box">严重</div>
+        </div>
+      </div>
+
+      <!-- 状态数值：HP, Hope, Stress -->
+      <div class="status-section">
+        <!-- HP 列 -->
+        <div class="status-column">
+          <span class="label">生命</span>
+          <div class="checkbox-row">{{HP}}</div>
+        </div>
+
+        <!-- Hope 列 -->
+        <div class="status-column">
+          <span class="label">希望</span>
+          <div class="checkbox-hope">{{HOPE}}</div>
+        </div>
+
+        <!-- Stress 列 -->
+        <div class="status-column">
+          <span class="label">压力</span>
+          <div class="checkbox-row">{{STRESS}}</div>
+        </div>
+      </div>
+
+      <!-- 经历区域 -->
+      <div class="experience-section">
+        <span class="exp-title">经历</span>
+        {{EXPERIENCE}}
+        <!-- <div class="exp-row">
+          <div class="line"></div>
+          <div class="square-check"></div>
+        </div>
+        <div class="exp-row">
+          <div class="line"></div>
+          <div class="square-check"></div>
+        </div>
+        <div class="exp-row">
+          <div class="line"></div>
+          <div class="square-check">2</div>
+        </div> -->
+      </div>
+    </div>
+  </body>
+</html>
