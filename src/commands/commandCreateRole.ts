@@ -2,6 +2,7 @@ import { Context, $ } from "koishi";
 import {} from "koishi-plugin-puppeteer";
 import { Config } from "../config";
 import { Property_Dict } from "../utiles/dict";
+import { showPlayerPage } from "./commandBoard";
 // import { Character } from "../database";
 
 export interface CreateRoleCommand {
@@ -89,6 +90,21 @@ export function setRole(ctx: Context) {
     session.send(`新人登场！${name}进入了这幕舞台`);
   });
 
+  ctx.command("gm [name] 设置主持人").action(async ({ session }, name) => {
+    if (!session) return "无法获取用户信息。";
+    const user = session.event.user;
+    const groupId = session.guildId;
+    await ctx.database.create("playercharacter", {
+      userid: user.id,
+      username: user.name,
+      groupid: groupId,
+      useable: true,
+      rolename: name,
+      experience: "",
+    });
+    session.send(`导演${name || user.name}已经准备就绪`);
+  });
+
   // 切换当前登场角色
   ctx
     .command("pcswitch [name] 切换当前登场角色")
@@ -113,10 +129,10 @@ export function setRole(ctx: Context) {
     if (prefixMatch) {
       // 2. 提取前缀后的剩余字符串，并去除首尾空白
       const rest = session.content.slice(prefixMatch[0].length).trimStart();
-
-      // 3. 调用结果方程
       const user = session.event.user;
       const groupId = session.guildId;
+
+      // 3. 调用结果方程
 
       const character = await ctx.database
         .select("playercharacter")
@@ -154,55 +170,95 @@ export function setRole(ctx: Context) {
       const jsonString = JSON.stringify(result.experience);
       console.log(result);
 
-      await ctx.database.set(
-        "playercharacter",
-        {
-          userid: user.id,
-          useable: true,
-          groupid: groupId,
-        },
-        {
-          username: user.name,
-          "property.agility": $.add(
-            character[0].property.agility,
-            result.agility || 0,
-          ),
-          "property.strength": $.add(
-            character[0].property.strength,
-            result.strength || 0,
-          ),
-          "property.finesse": $.add(
-            character[0].property.finesse,
-            result.finesse || 0,
-          ),
-          "property.instinct": $.add(
-            character[0].property.instinct,
-            result.instinct || 0,
-          ),
-          "property.presence": $.add(
-            character[0].property.presence,
-            result.presence || 0,
-          ),
-          "property.knowledge": $.add(
-            character[0].property.knowledge,
-            result.knowledge || 0,
-          ),
+      if (rest.length > 20) {
+        await ctx.database.set(
+          "playercharacter",
+          {
+            userid: user.id,
+            useable: true,
+            groupid: groupId,
+          },
+          {
+            username: user.name,
+            "property.agility": result.agility || 0,
+            "property.strength": result.strength || 0,
+            "property.finesse": result.finesse || 0,
+            "property.instinct": result.instinct || 0,
+            "property.presence": result.presence || 0,
+            "property.knowledge": result.knowledge || 0,
 
-          "armor.value": $.add(character[0].armor.value, result.armor || 0),
-          "armor.max": $.add(character[0].armor.max, result.armor_max || 0),
-          "hp.value": $.add(character[0].hp.value, result.health || 0),
-          "hp.max": $.add(character[0].hp.max, result.health_max || 0),
+            "armor.value": result.armor || 0,
+            "armor.max": result.armor_max || 0,
+            "hp.value": result.health || 0,
+            "hp.max": result.health_max || 0,
 
-          "stress.value": $.add(character[0].stress.value, result.stress || 0),
-          "stress.max": $.add(character[0].stress.max, result.stress_max || 0),
+            "stress.value": result.stress || 0,
+            "stress.max": result.stress_max || 0,
+            "hope.value": result.hope || 0,
+            "hope.max": result.hope_max || 0,
+            major: result.major || 0,
+            severe: result.severe || 0,
+            experience: jsonString,
+          },
+        );
+        await showPlayerPage(ctx, session);
+      } else {
+        await ctx.database.set(
+          "playercharacter",
+          {
+            userid: user.id,
+            useable: true,
+            groupid: groupId,
+          },
+          {
+            username: user.name,
+            "property.agility": $.add(
+              character[0].property.agility,
+              result.agility || 0,
+            ),
+            "property.strength": $.add(
+              character[0].property.strength,
+              result.strength || 0,
+            ),
+            "property.finesse": $.add(
+              character[0].property.finesse,
+              result.finesse || 0,
+            ),
+            "property.instinct": $.add(
+              character[0].property.instinct,
+              result.instinct || 0,
+            ),
+            "property.presence": $.add(
+              character[0].property.presence,
+              result.presence || 0,
+            ),
+            "property.knowledge": $.add(
+              character[0].property.knowledge,
+              result.knowledge || 0,
+            ),
 
-          "hope.value": $.add(character[0].hope.value, result.hope || 0),
-          "hope.max": $.add(character[0].hope.max, result.hope_max || 0),
-          major: $.add(character[0].major, result.major || 0),
-          severe: $.add(character[0].severe, result.severe || 0),
-          experience: jsonString,
-        },
-      );
+            "armor.value": $.add(character[0].armor.value, result.armor || 0),
+            "armor.max": $.add(character[0].armor.max, result.armor_max || 0),
+            "hp.value": $.add(character[0].hp.value, result.health || 0),
+            "hp.max": $.add(character[0].hp.max, result.health_max || 0),
+
+            "stress.value": $.add(
+              character[0].stress.value,
+              result.stress || 0,
+            ),
+            "stress.max": $.add(
+              character[0].stress.max,
+              result.stress_max || 0,
+            ),
+
+            "hope.value": $.add(character[0].hope.value, result.hope || 0),
+            "hope.max": $.add(character[0].hope.max, result.hope_max || 0),
+            major: $.add(character[0].major, result.major || 0),
+            severe: $.add(character[0].severe, result.severe || 0),
+            experience: jsonString,
+          },
+        );
+      }
       session.send(`[${character[0].rolename}] 设置属性成功`);
       const nowRole = await ctx.database
         .select("playercharacter")
@@ -222,30 +278,134 @@ export function setRole(ctx: Context) {
     return next();
   });
 
-  ctx.command("pclist 列出所有角色").action(async ({ session }) => {
-    if (!session) return "无法获取用户信息。";
-    console.log(session.event.user, session.user);
-    const user = session.event.user;
-    const groupId = session.guildId;
+  // 移除登场角色属性
+  ctx
+    .command("pcpc [name] 移除登场角色属性")
+    .action(async ({ session }, name) => {
+      if (!session) return "无法获取用户信息。";
+      const user = session.event.user;
+      const groupId = session.guildId;
 
-    const characterExist = await ctx.database
-      .select("playercharacter")
-      .where((row) => $.eq(row.userid, user.id))
-      .where((row) => $.eq(row.groupid, groupId))
-      .execute();
-    if (characterExist.length > 0) {
-      const characterList = characterExist.map((row) => {
-        if (row.useable == true) {
-          return `${row.rolename}(登场中)`;
+      const character = name
+        ? await ctx.database.set(
+            "playercharacter",
+            {
+              userid: user.id,
+              rolename: name,
+              useable: true,
+              groupid: groupId,
+            },
+            {
+              username: user.name,
+              "property.agility": 0,
+              "property.strength": 0,
+              "property.finesse": 0,
+              "property.instinct": 0,
+              "property.presence": 0,
+              "property.knowledge": 0,
+              "armor.value": 0,
+              "armor.max": 0,
+              "hp.value": 0,
+              "hp.max": 0,
+              "stress.value": 0,
+              "stress.max": 0,
+              "hope.value": 0,
+              "hope.max": 0,
+              major: 0,
+              severe: 0,
+              experience: "",
+            },
+          )
+        : await ctx.database.set(
+            "playercharacter",
+            {
+              userid: user.id,
+              useable: true,
+              groupid: groupId,
+            },
+            {
+              username: user.name,
+              "property.agility": 0,
+              "property.strength": 0,
+              "property.finesse": 0,
+              "property.instinct": 0,
+              "property.presence": 0,
+              "property.knowledge": 0,
+              "armor.value": 0,
+              "armor.max": 0,
+              "hp.value": 0,
+              "hp.max": 0,
+              "stress.value": 0,
+              "stress.max": 0,
+              "hope.value": 0,
+              "hope.max": 0,
+              major: 0,
+              severe: 0,
+              experience: "",
+            },
+          );
+
+      if (!character.matched) {
+        session.send(`你这一幕舞台中没有登场的角色`);
+        return;
+      }
+    });
+
+  // 列出所有角色
+  ctx
+    .command("pclist [flag] 列出所有角色")
+    .action(async ({ session }, flag) => {
+      if (!session) return "无法获取用户信息。";
+      console.log(session.event.user, session.user);
+      const user = session.event.user;
+      const groupId = session.guildId;
+
+      if (flag) {
+        const characterExist = await ctx.database
+          .select("playercharacter")
+          .where((row) => $.eq(row.groupid, groupId))
+          .execute();
+        if (characterExist.length > 0) {
+          const characterList = characterExist.map((row) => {
+            if (row.useable == true) {
+              return `${row.rolename}(登场中)`;
+            } else {
+              return `${row.rolename}`;
+            }
+          });
+          session.send(
+            `这一幕舞台中登场过的角色有：${characterList.join(", ")}`,
+          );
         } else {
-          return `${row.rolename}`;
+          session.send(`这一幕舞台中没有登场的角色`);
         }
-      });
-      session.send(`你这一幕舞台中登场过的角色有：${characterList.join(", ")}`);
-    } else {
-      session.send(`你这一幕舞台中没有登场的角色`);
-    }
-  });
+      } else {
+        const characterExist = flag
+          ? await ctx.database
+              .select("playercharacter")
+              .where((row) => $.eq(row.groupid, groupId))
+              .execute()
+          : await ctx.database
+              .select("playercharacter")
+              .where((row) => $.eq(row.userid, user.id))
+              .where((row) => $.eq(row.groupid, groupId))
+              .execute();
+        if (characterExist.length > 0) {
+          const characterList = characterExist.map((row) => {
+            if (row.useable == true) {
+              return `${row.rolename}(登场中)`;
+            } else {
+              return `${row.rolename}`;
+            }
+          });
+          session.send(
+            `你这一幕舞台中登场过的角色有：${characterList.join(", ")}`,
+          );
+        } else {
+          session.send(`你这一幕舞台中没有登场的角色`);
+        }
+      }
+    });
 
   ctx
     .command("pcremove [name] 移除登场角色")

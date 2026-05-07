@@ -3,7 +3,7 @@ import {} from "koishi-plugin-puppeteer";
 import { Config } from "../config";
 import { Property_Dict } from "../utiles/dict";
 import fs from "node:fs";
-import path from "node:path";
+import { resolveTemplatePath } from "../pathway";
 
 type PuppeteerPage = Awaited<
   ReturnType<NonNullable<Context["puppeteer"]>["page"]>
@@ -35,6 +35,10 @@ async function waitForCaptureReady(page: PuppeteerPage): Promise<void> {
 
     await Promise.all(imageTasks);
   });
+}
+
+export async function showPlayerPage(ctx: Context, session: any) {
+  return await createImage(ctx, session);
 }
 
 export function setBoard(ctx: Context) {
@@ -77,7 +81,7 @@ async function createImage(
   let captureRoot: PuppeteerElement | null = null;
   let shouldClosePage = true;
 
-  const templatePath = path.resolve(__dirname, "../../data/ttt.html");
+  const templatePath = resolveTemplatePath();
   try {
     page = await ctx.puppeteer.page();
     console.log(page);
@@ -107,7 +111,7 @@ async function createImage(
     );
 
     const userInfoHtml = `<div class="avatar"><img src="${escHtml(user.avatar || "")}" alt="头像" class="avatar-image" /></div>
-        <div class="name-input">${user.name}</div>`;
+        <div class="name-input">${characterInfo[0].rolename || user.name}</div>`;
     const damageMajor = `<div class="damage-box number-box">${characterInfo[0].major ?? 0}</div>`;
     const damageSevere = `<div class="damage-box number-box">${characterInfo[0].severe ?? 0}</div>`;
 
@@ -194,6 +198,7 @@ function renderPointItem(item: any, reverse = false): string {
   // 根据 reverse 参数决定先渲染哪一种 span
   const firstCount = reverse ? item.max - item.value : item.value;
   const secondCount = reverse ? item.value : item.max - item.value;
+  const thirdCount = 12 - item.max;
 
   // 先渲染第一部分
   for (let i = 0; i < firstCount; i++) {

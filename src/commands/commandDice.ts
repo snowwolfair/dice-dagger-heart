@@ -246,13 +246,28 @@ async function rollResult(
         `${session.event.user.name} 掷出了它的命运，结果会是什么呢\n--------------------------------------------\n希望骰 ${hope}        与        恐惧骰 ${despair} \n-------------------------------------------\n            关键成功！\n[希望值变化]: ${hopeChange()}\n[压力值变化]: ${stressChange()}\n[命运的寄语]: ${wonderful(config)}      `,
       );
     }
+  } else if (rest === "r") {
+    if (hope > despair) {
+      session.send(
+        `${session.event.user.name} 掷出了它的命运，结果会是什么呢\n--------------------------------------------\n希望骰 ${hope}       与        恐惧骰 ${despair}\n-------------------------------------------\n      合计 ${result}         希望结果\n[命运的寄语]: ${hopeful(config)}      `,
+      );
+    } else if (hope < despair) {
+      session.send(
+        `${session.event.user.name} 掷出了它的命运，结果会是什么呢\n--------------------------------------------\n希望骰 ${hope}       与        恐惧骰 ${despair}\n-------------------------------------------\n      合计 ${result}         恐惧结果\n[命运的寄语]: ${desperate(config)}      `,
+      );
+    } else {
+      session.send(
+        `${session.event.user.name} 掷出了它的命运，结果会是什么呢\n--------------------------------------------\n希望骰 ${hope}        与        恐惧骰 ${despair} \n-------------------------------------------\n            关键成功!\n[命运的寄语]: ${wonderful(config)}      `,
+      );
+    }
   } else {
     const termRegex = /([+-]?)\s*(?:(\d*)d(\d+)|([^+-]+?))(?=\s*[+-]|$)/g;
     const terms = Array.from(rest.matchAll(termRegex));
     // 4. 检查是否完整匹配（防止中间有非法字符）
     const reconstructed = terms.map((t) => t[0]).join("");
     if (reconstructed.replace(/\s+/g, "") !== rest.replace(/\s+/g, "")) {
-      throw new Error(`表达式包含非法内容："${rest}"`);
+      ctx.logger.error(`表达式包含非法内容："${rest}"`);
+      return;
     }
 
     // 5. 计算总和
@@ -300,6 +315,7 @@ async function rollResult(
           i++;
         } else {
           if (!character || character.length === 0) {
+            ctx.logger.error(`无法解析项，且未找到角色信息："${str}"`);
             session.send(`无法解析项，且未找到角色信息："${str}"`);
             return;
           }
@@ -317,8 +333,8 @@ async function rollResult(
             total += Number(experienceObject[pureName]);
             i++;
           } else {
+            ctx.logger.error(`无法解析项: "${str}"`);
             session.send(`无法解析项："${str}"`);
-            throw new Error(`无法解析项："${str}"`);
           }
         }
       }
