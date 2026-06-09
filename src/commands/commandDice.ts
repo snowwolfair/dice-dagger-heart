@@ -99,6 +99,25 @@ export function commandDice(ctx: Context, config: Config) {
 
   //     // const playerName = await getPlayerName(ctx, session);
   //   });
+
+  // 前置掷骰中间件
+  ctx.middleware((session, next) => {
+    if (!session) return "无法获取用户信息。";
+    const prefixMatch = session.content.match(/^([。\.]ddr)/i);
+    if (prefixMatch) {
+      const [hope, despair] = rollTwoDice(1);
+      const result = hope + despair;
+
+      // 2. 提取前缀后的剩余字符串，并去除首尾空白
+      const rest = session.content.slice(prefixMatch[0].length).trimStart();
+
+      // 3. 调用结果方程
+      rollResult(rest, despair, hope, session, ctx, result, config, true);
+    }
+    return next();
+  }, true);
+
+  // 掷骰中间件
   ctx.middleware((session, next) => {
     if (!session) return "无法获取用户信息。";
     const prefixMatch = session.content.match(/^([。\.]dd)/i);
@@ -156,7 +175,7 @@ function parseTerm(term: string): {
   throw new Error(`无效项: ${term}`);
 }
 
-// 二元骰 希望骰与绝望骰
+// 二元骰 希望骰与恐惧骰
 function rollTwoDice(count: number): number[] {
   const hope = Math.floor(Math.random() * 12) + 1;
   const despair = Math.floor(Math.random() * 12) + 1;
@@ -172,6 +191,7 @@ async function rollResult(
   ctx: Context,
   result: number,
   config: Config,
+  isPrepend?: boolean,
 ) {
   const user = session.event.user;
   const groupId = session.guildId;
@@ -188,9 +208,28 @@ async function rollResult(
       return `${normalHope}->${normalHope + 1}`;
     } else {
       if (character[0].hope.value == 6) {
-        return `6`;
+        return `6(已满)`;
       } else {
         return `${character[0].hope.value}->${character[0].hope.value + 1}`;
+      }
+    }
+  };
+
+  const gmCharacter = await ctx.database
+    .select("playercharacter")
+    .where((row) => $.eq(row.rolename, "GM"))
+    .where((row) => $.eq(row.groupid, session.guildId))
+    .where((row) => $.eq(row.useable, true))
+    .execute();
+  const normalFear = 0;
+  const fearChange = () => {
+    if (gmCharacter.length == 0) {
+      return `${normalFear}->${normalFear + 1}`;
+    } else {
+      if (gmCharacter[0].fear.value == 12) {
+        return `12(已满)`;
+      } else {
+        return `${gmCharacter[0].fear.value}->${gmCharacter[0].fear.value + 1}`;
       }
     }
   };
@@ -208,7 +247,21 @@ async function rollResult(
     }
   };
 
-  if (rest === "") {
+  if (isPrepend) {
+    if (hope > despair) {
+      session.send(
+        `${session.event.user.name} 掷出了它的命运，结果会是什么呢\n--------------------------------------------\n希望骰 ${hope}       与        恐惧骰 ${despair}\n-------------------------------------------\n      合计 ${result}         希望结果\n[反应掷骰]\n[命运的寄语]: ${hopeful(config)}      `,
+      );
+    } else if (hope < despair) {
+      session.send(
+        `${session.event.user.name} 掷出了它的命运，结果会是什么呢\n--------------------------------------------\n希望骰 ${hope}       与        恐惧骰 ${despair}\n-------------------------------------------\n      合计 ${result}         恐惧结果\n[反应掷骰]\n[命运的寄语]: ${desperate(config)}      `,
+      );
+    } else {
+      session.send(
+        `${session.event.user.name} 掷出了它的命运，结果会是什么呢\n--------------------------------------------\n希望骰 ${hope}        与        恐惧骰 ${despair} \n-------------------------------------------\n            关键成功!\n[反应掷骰]\n[命运的寄语]: ${wonderful(config)}      `,
+      );
+    }
+  } else if (rest === "") {
     if (hope > despair) {
       await ctx.database.set(
         "playercharacter",
@@ -226,8 +279,19 @@ async function rollResult(
         `${session.event.user.name} 掷出了它的命运，结果会是什么呢\n--------------------------------------------\n希望骰 ${hope}       与        恐惧骰 ${despair}\n-------------------------------------------\n      合计 ${result}         希望结果\n[希望值变化]: ${hopeChange()} \n[命运的寄语]: ${hopeful(config)}      `,
       );
     } else if (hope < despair) {
+      await ctx.database.set(
+        "playercharacter",
+        {
+          rolename: "GM",
+          useable: true,
+          groupid: groupId,
+        },
+        (row) => ({
+          "fear.value": $.min([$.add(row.fear.value, 1), 12]),
+        }),
+      );
       session.send(
-        `${session.event.user.name} 掷出了它的命运，结果会是什么呢\n--------------------------------------------\n希望骰 ${hope}       与        恐惧骰 ${despair}\n-------------------------------------------\n      合计 ${result}         恐惧结果\n[命运的寄语]: ${desperate(config)}      `,
+        `${session.event.user.name} 掷出了它的命运，结果会是什么呢\n--------------------------------------------\n希望骰 ${hope}       与        恐惧骰 ${despair}\n-------------------------------------------\n      合计 ${result}         恐惧结果\n[恐惧点变化]: ${fearChange()}\n[命运的寄语]: ${desperate(config)}      `,
       );
     } else {
       await ctx.database.set(
@@ -244,20 +308,6 @@ async function rollResult(
       );
       session.send(
         `${session.event.user.name} 掷出了它的命运，结果会是什么呢\n--------------------------------------------\n希望骰 ${hope}        与        恐惧骰 ${despair} \n-------------------------------------------\n            关键成功！\n[希望值变化]: ${hopeChange()}\n[压力值变化]: ${stressChange()}\n[命运的寄语]: ${wonderful(config)}      `,
-      );
-    }
-  } else if (rest === "r") {
-    if (hope > despair) {
-      session.send(
-        `${session.event.user.name} 掷出了它的命运，结果会是什么呢\n--------------------------------------------\n希望骰 ${hope}       与        恐惧骰 ${despair}\n-------------------------------------------\n      合计 ${result}         希望结果\n[命运的寄语]: ${hopeful(config)}      `,
-      );
-    } else if (hope < despair) {
-      session.send(
-        `${session.event.user.name} 掷出了它的命运，结果会是什么呢\n--------------------------------------------\n希望骰 ${hope}       与        恐惧骰 ${despair}\n-------------------------------------------\n      合计 ${result}         恐惧结果\n[命运的寄语]: ${desperate(config)}      `,
-      );
-    } else {
-      session.send(
-        `${session.event.user.name} 掷出了它的命运，结果会是什么呢\n--------------------------------------------\n希望骰 ${hope}        与        恐惧骰 ${despair} \n-------------------------------------------\n            关键成功!\n[命运的寄语]: ${wonderful(config)}      `,
       );
     }
   } else {
@@ -356,8 +406,19 @@ async function rollResult(
         `${session.event.user.name} 掷出了它的命运，结果会是什么呢\n调整值: ${adjustments.join(",")}\n--------------------------------------------\n希望骰 ${hope}       与        恐惧骰 ${despair}\n-------------------------------------------\n      合计 ${result + total}       希望结果\n[希望值变化]: ${hopeChange()} \n[命运的寄语]: ${hopeful(config)}      `,
       );
     } else if (hope < despair) {
+      await ctx.database.set(
+        "playercharacter",
+        {
+          rolename: "GM",
+          useable: true,
+          groupid: groupId,
+        },
+        (row) => ({
+          "fear.value": $.min([$.add(row.fear.value, 1), 12]),
+        }),
+      );
       session.send(
-        `${session.event.user.name} 掷出了它的命运，结果会是什么呢\n调整值: ${adjustments.join(",")}\n--------------------------------------------\n希望骰 ${hope}       与        恐惧骰 ${despair}\n-------------------------------------------\n      合计 ${result + total}       恐惧结果\n[命运的寄语]: ${desperate(config)}      `,
+        `${session.event.user.name} 掷出了它的命运，结果会是什么呢\n调整值: ${adjustments.join(",")}\n--------------------------------------------\n希望骰 ${hope}       与        恐惧骰 ${despair}\n-------------------------------------------\n      合计 ${result + total}       恐惧结果\n[恐惧点变化]: ${fearChange()}\n[命运的寄语]: ${desperate(config)}      `,
       );
     } else {
       await ctx.database.set(

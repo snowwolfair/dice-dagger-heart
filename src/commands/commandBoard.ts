@@ -96,16 +96,10 @@ async function createImage(
       ctx.logger.warn(`群组 ${session.guildId} 没有人物卡数据，无法渲染。`);
       return null;
     }
-
-    console.log(session.event.user, session.user);
     const user = session.event.user;
     const groupId = session.guildId;
 
     const templateHtml = await fs.promises.readFile(templatePath, "utf-8");
-    console.log(templateHtml);
-
-    console.log(characterInfo[0]);
-
     const Dict_Reverse = Object.fromEntries(
       Object.entries(Property_Dict).map(([cn, en]) => [en, cn]),
     );
@@ -116,8 +110,7 @@ async function createImage(
     const damageSevere = `<div class="damage-box number-box">${characterInfo[0].severe ?? 0}</div>`;
 
     const hpHtml = renderPointItem(characterInfo[0].hp, true);
-    const hopeHtml = renderPointItem(characterInfo[0].hope, false);
-    console.log(hopeHtml);
+    const hopeHtml = renderPointItem(characterInfo[0].hope, false, true);
     const stressHtml = renderPointItem(characterInfo[0].stress, false);
 
     // const experienceHtml = renderPointItem(characterInfo[0].experience, false);
@@ -140,7 +133,6 @@ async function createImage(
         .join("\n");
     }
 
-    console.log(experienceHtml);
     const propertyItemsHtml = Object.entries(characterInfo[0].property)
       .map(([key, value]) => renderPropertyItem(key, value, Dict_Reverse))
       .join("\n");
@@ -154,10 +146,9 @@ async function createImage(
       .replace("{{HOPE}}", hopeHtml)
       .replace("{{STRESS}}", stressHtml)
       .replace("{{EXPERIENCE}}", experienceHtml);
-
     // .replace('{{STATUS}}', status)
     // .replace('{{EXPERIENCE}}', proCon)
-
+    console.log(finalHtml);
     // characterInfo
     await page.setContent(finalHtml, { waitUntil: "domcontentloaded" });
     await waitForCaptureReady(page);
@@ -192,22 +183,33 @@ async function createImage(
   }
 }
 
-function renderPointItem(item: any, reverse = false): string {
+function renderPointItem(item: any, reverse = false, isHope?: boolean): string {
   let html: string[] = [];
 
   // 根据 reverse 参数决定先渲染哪一种 span
   const firstCount = reverse ? item.max - item.value : item.value;
   const secondCount = reverse ? item.value : item.max - item.value;
-  const thirdCount = 12 - item.max;
 
   // 先渲染第一部分
   for (let i = 0; i < firstCount; i++) {
-    html.push(`<span class="checkbox-checked"></span>`);
+    html.push(`<span class="checkbox checkbox-checked"></span>`);
   }
 
   // 再渲染第二部分
   for (let i = 0; i < secondCount; i++) {
     html.push(`<span class="checkbox"></span>`);
+  }
+
+  if (isHope) {
+    const thirdCount = 6 - item.max;
+    for (let i = 0; i < thirdCount; i++) {
+      html.push(`<span class="checkbox checkbox-unusable"></span>`);
+    }
+  } else {
+    const thirdCount = 12 - item.max;
+    for (let i = 0; i < thirdCount; i++) {
+      html.push(`<span class="checkbox checkbox-unusable"></span>`);
+    }
   }
 
   return html.join("\n");

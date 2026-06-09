@@ -103,6 +103,18 @@
         font-weight: bold;
       }
 
+      .armor {
+        background-image: url("../asset/armor_slot.svg");
+        background-repeat: no-repeat; /* 防止图片重复 */
+        background-position: center; /* 图片居中 */
+        background-size: contain; /* 保持图片比例 */
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        color: #333;
+        font-weight: bold;
+      }
+
       /* 左侧和中间的6个小方框 */
       .small-box {
         height: 80px;
@@ -206,6 +218,9 @@
       .checkbox-checked {
         background-color: var(--border-color);
       }
+      .checkbox-unusable {
+        border: 1px dashed var(--border-color);
+      }
 
       /* 经历区域 */
       .experience-section {
@@ -255,7 +270,10 @@
       <div class="header">{{CHARACTER_NAME}}</div>
 
       <!-- 中间：属性框 -->
-      <div class="mid-section">{{PROPERTY_ITEMS}}</div>
+      <div class="mid-section">
+        {{PROPERTY_ITEMS}}
+        <div class="armor">1/12</div>
+      </div>
 
       <!-- 伤害阈值 -->
       <div class="damage-section">
@@ -293,18 +311,6 @@
       <div class="experience-section">
         <span class="exp-title">经历</span>
         {{EXPERIENCE}}
-        <!-- <div class="exp-row">
-          <div class="line"></div>
-          <div class="square-check"></div>
-        </div>
-        <div class="exp-row">
-          <div class="line"></div>
-          <div class="square-check"></div>
-        </div>
-        <div class="exp-row">
-          <div class="line"></div>
-          <div class="square-check">2</div>
-        </div> -->
       </div>
     </div>
   </body>

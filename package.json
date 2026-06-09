@@ -1,7 +1,7 @@
 {
   "name": "@mashroomwolf/koishi-plugin-dice-dagger-heart",
   "description": "dice-dagger-heart bot (including dice rolling)",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "main": "lib/index.js",
   "typings": "lib/index.d.ts",
   "files": [

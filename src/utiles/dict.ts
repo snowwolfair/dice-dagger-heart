@@ -13,6 +13,8 @@ export const Property_Dict = {
   希望上限: "hope_max",
   护甲: "armor",
   护甲上限: "armor_max",
+  恐惧: "fear",
+  恐惧上限: "fear_max",
   闪避: "evasion",
   重伤阈值: "major",
   严重阈值: "severe",

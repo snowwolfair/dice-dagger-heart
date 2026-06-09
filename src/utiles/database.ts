@@ -39,6 +39,10 @@ export interface playerCharacter {
     value: number;
     max: number;
   };
+  fear: {
+    value: number;
+    max: number;
+  };
   major: number;
   severe: number;
   experience: string;
@@ -161,6 +165,16 @@ export async function createPlayerCharacterTable(ctx: Context) {
       "hope.max": {
         type: "integer",
         initial: 6,
+        nullable: false,
+      },
+      "fear.value": {
+        type: "integer",
+        initial: 0,
+        nullable: false,
+      },
+      "fear.max": {
+        type: "integer",
+        initial: 12,
         nullable: false,
       },
       major: "integer",
