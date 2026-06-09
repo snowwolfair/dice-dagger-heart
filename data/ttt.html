@@ -51,8 +51,15 @@
         display: flex;
         justify-content: center;
         align-items: center;
+        overflow: hidden;
       }
 
+      .avatar-image {
+        width: 100%;
+        height: 100%;
+        object-fit: cover; /* 确保图片等比缩放并填满容器，避免拉伸变形 */
+        display: block; /* 消除 inline 元素底部可能出现的默认间隙 */
+      }
       .name-input {
         flex-grow: 1;
         height: 40px;
