@@ -2,6 +2,7 @@ import { Context, $, Session } from "koishi";
 import { Config } from "../config";
 import { Property_Dict, PRO_CON_Dict, Cook_Dict } from "../utiles/dict";
 import { ensureEnabled } from "./commandGugu";
+import { buildCardName } from "./commandCreateRole";
 
 // ==================== 二元骰结果配置 ====================
 
@@ -413,6 +414,26 @@ async function rollResult(
   // 3. 应用数据库资源更新（反应掷骰跳过）
   if (!isPrepend) {
     await applyOutcomeUpdates(ctx, spec, user, groupId);
+    // 恐惧结果：GM 恐惧值变化后同步更新其群名片
+    if (
+      outcomeKey === "despair" &&
+      gmCharacter.length > 0 &&
+      session.platform === "onebot"
+    ) {
+      const updatedGm = await ctx.database
+        .select("playercharacter")
+        .where((row) => $.eq(row.rolename, "GM"))
+        .where((row) => $.eq(row.groupid, groupId))
+        .where((row) => $.eq(row.useable, true))
+        .execute();
+      if (updatedGm.length > 0) {
+        await session.onebot.setGroupCard(
+          groupId,
+          updatedGm[0].userid,
+          buildCardName(updatedGm[0]),
+        );
+      }
+    }
   }
 
   // 4. 构建并发送消息

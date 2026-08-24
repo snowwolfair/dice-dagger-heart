@@ -35,81 +35,114 @@ async function characterName(
   return characterUsed;
 }
 
+/** 构建群名片文本。GM 用原始名+恐惧，普通角色用角色名+资源，未设属性时仅角色名 */
+export function buildCardName(character: any): string {
+  if (character.rolename === "GM") {
+    return `${character.username} 恐惧${character.fear.value}/${character.fear.max}`;
+  }
+  // 新建角色（max 全为 0）尚未设置属性，只显示角色名
+  if (
+    character.hope.max === 0 &&
+    character.hp.max === 0 &&
+    character.stress.max === 0
+  ) {
+    return character.rolename;
+  }
+  return `${character.rolename} 希望${character.hope.value}/${character.hope.max} 生命${character.hp.value}/${character.hp.max} 压力${character.stress.value}/${character.stress.max}`;
+}
+
+/** 更新群名片（仅 onebot 平台） */
+async function updateGroupCard(session: any, character: any) {
+  if (session.platform !== "onebot") return;
+  await session.onebot.setGroupCard(
+    session.guildId,
+    session.event.user.id,
+    buildCardName(character),
+  );
+}
+
 export function setRole(ctx: Context) {
   // 设置名称
-  ctx.command("pcnew [name] 设置名称").action(async ({ session }, name) => {
-    if (!session) return "无法获取用户信息。";
-    if (!(await ensureEnabled(ctx, session))) return;
-    console.log(session.event.user, session.user);
-    const user = session.event.user;
-    const groupId = session.guildId;
+  ctx
+    .command("pcnew [name] 设置名称")
+    .alias("nn")
+    .action(async ({ session }, name) => {
+      if (!session) return "无法获取用户信息。";
+      if (!(await ensureEnabled(ctx, session))) return;
+      console.log(session.event.user, session.user);
+      const user = session.event.user;
+      const groupId = session.guildId;
 
-    if (!name) {
-      session.send("请输入角色名称");
-      return;
-    }
+      if (!name) {
+        session.send("请输入角色名称");
+        return;
+      }
 
-    const characterExist = await characterName(ctx, user, groupId, name);
-    if (characterExist.length > 0) {
-      session.send(`角色${name}已存在,已自动切换到对应角色`);
-      await switchRoles(ctx, session, name);
-      return;
-    }
+      const characterExist = await characterName(ctx, user, groupId, name);
+      if (characterExist.length > 0) {
+        session.send(`角色${name}已存在,已自动切换到对应角色`);
+        await switchRoles(ctx, session, name);
+        return;
+      }
 
-    const characterUseable = await usedCharacter(ctx, user, groupId);
-    if (characterUseable.length > 0) {
-      await ctx.database.set(
-        "playercharacter",
-        {
-          userid: user.id,
-          groupid: groupId,
+      const characterUseable = await usedCharacter(ctx, user, groupId);
+      if (characterUseable.length > 0) {
+        await ctx.database.set(
+          "playercharacter",
+          {
+            userid: user.id,
+            groupid: groupId,
+          },
+          {
+            useable: false,
+          },
+        );
+      }
+
+      await ctx.database.create("playercharacter", {
+        userid: user.id,
+        username: user.name,
+        groupid: groupId,
+        useable: true,
+        rolename: name,
+        property: {
+          agility: 0,
+          strength: 0,
+          finesse: 0,
+          instinct: 0,
+          presence: 0,
+          knowledge: 0,
         },
-        {
-          useable: false,
+        armor: {
+          value: 0,
+          max: 0,
         },
-      );
-    }
-
-    await ctx.database.create("playercharacter", {
-      userid: user.id,
-      username: user.name,
-      groupid: groupId,
-      useable: true,
-      rolename: name,
-      property: {
-        agility: 0,
-        strength: 0,
-        finesse: 0,
-        instinct: 0,
-        presence: 0,
-        knowledge: 0,
-      },
-      armor: {
-        value: 0,
-        max: 0,
-      },
-      hp: {
-        value: 0,
-        max: 0,
-      },
-      stress: {
-        value: 0,
-        max: 0,
-      },
-      hope: {
-        value: 0,
-        max: 0,
-      },
-      fear: {
-        value: 0,
-        max: 0,
-      },
-      major: 0,
-      severe: 0,
-      experience: "",
+        hp: {
+          value: 0,
+          max: 0,
+        },
+        stress: {
+          value: 0,
+          max: 0,
+        },
+        hope: {
+          value: 0,
+          max: 0,
+        },
+        fear: {
+          value: 0,
+          max: 0,
+        },
+        major: 0,
+        severe: 0,
+        experience: "",
+      });
+      session.send(`新人登场！${name}进入了这幕舞台`);
+      // 创建角色后立刻修改群名片为角色名
+      if (session.platform === "onebot") {
+        await session.onebot.setGroupCard(groupId, user.id, name);
+      }
     });
-    session.send(`新人登场！${name}进入了这幕舞台`);
-  });
 
   ctx.command("gm 设置主持人").action(async ({ session }) => {
     if (!session) return "无法获取用户信息。";
@@ -155,6 +188,14 @@ export function setRole(ctx: Context) {
         experience: "",
       });
       session.send(`导演[${user.name}]已经准备就绪`);
+      // GM 名片保持原名称，后面加恐惧点计数
+      if (session.platform === "onebot") {
+        await session.onebot.setGroupCard(
+          groupId,
+          user.id,
+          `${user.name} 恐惧0/12`,
+        );
+      }
     }
   });
 
@@ -335,14 +376,10 @@ export function setRole(ctx: Context) {
       }
 
       session.send(`[${character[0].rolename}] 设置属性成功`);
+      // 设置属性后更新群名片显示资源
       const nowRole = await usedCharacter(ctx, user, groupId);
-
-      const cardName = `${nowRole[0].rolename} 希望${nowRole[0].hope.value}/${nowRole[0].hope.max} 生命${nowRole[0].hp.value}/${nowRole[0].hp.max} 压力${nowRole[0].stress.value}/${nowRole[0].stress.max}`;
-      console.log(cardName);
-
-      if (session.platform == "onebot") {
-        const cardName = `${nowRole[0].rolename} 希望${nowRole[0].hope.value}/${nowRole[0].hope.max} 生命${nowRole[0].hp.value}/${nowRole[0].hp.max} 压力${nowRole[0].stress.value}/${nowRole[0].stress.max}`;
-        session.onebot.setGroupCard(groupId, user.id, cardName);
+      if (nowRole.length > 0) {
+        await updateGroupCard(session, nowRole[0]);
       }
     }
 
@@ -568,6 +605,11 @@ async function switchRoles(ctx: Context, session: any, name: string) {
       },
     );
     session.send(`现在登场的角色是：${name}`);
+    // 切换角色后更新群名片为目标角色的资源
+    const switchedChar = await characterName(ctx, user, groupId, name);
+    if (switchedChar.length > 0) {
+      await updateGroupCard(session, switchedChar[0]);
+    }
   }
 }
 
