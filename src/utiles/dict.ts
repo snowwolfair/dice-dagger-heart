@@ -24,3 +24,12 @@ export const PRO_CON_Dict = {
   优势: "+1d6",
   劣势: "-1d6",
 };
+
+export const Cook_Dict = {
+  甜味: "d4",
+  咸味: "d6",
+  苦味: "d8",
+  酸味: "d10",
+  鲜味: "d12",
+  怪味: "d20",
+};

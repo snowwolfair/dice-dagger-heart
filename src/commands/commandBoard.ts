@@ -42,7 +42,7 @@ export async function showPlayerPage(ctx: Context, session: any) {
 }
 
 export function setBoard(ctx: Context) {
-  ctx.command("setboard  设置公告").action(async ({ session }, name) => {
+  ctx.command("showplayer  显示人物卡").action(async ({ session }, name) => {
     if (!session) return "无法获取用户信息。";
     if (!ctx.puppeteer) {
       ctx.logger.error("没有开启 puppeteer 服务，无法生成图片。");

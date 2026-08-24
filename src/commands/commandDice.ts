@@ -1,6 +1,6 @@
 import { Context, $, Session } from "koishi";
 import { Config } from "../config";
-import { Property_Dict, PRO_CON_Dict } from "../utiles/dict";
+import { Property_Dict, PRO_CON_Dict, Cook_Dict } from "../utiles/dict";
 
 export function commandDice(ctx: Context, config: Config) {
   ctx.command("r [values] 掷骰子").action(async ({ session }, values) => {
@@ -15,6 +15,202 @@ export function commandDice(ctx: Context, config: Config) {
     }
     nomalRollResult(values, session);
   });
+
+  ctx.command("cook 烹菜").action(async ({ session }, values) => {
+    if (!session) return "无法获取用户信息。";
+    await session.send(
+      `大锅已经支起来了，请往里面投放食材吧\n例： 1甜味+2酸味+4苦味`,
+    );
+
+    let cook = await session.prompt();
+    if (!cook) return "未投入任何食材,锅烧糊啦！";
+
+    let pool: { value: number; max: number; flavor: string }[] = [];
+    try {
+      pool = parseFlavor(cook);
+    } catch (error) {
+      ctx.logger.error(error.message);
+      return error.message;
+    }
+
+    let totalScore = 0;
+    let count = 0;
+
+    // 4. 核心交互循环：只要锅里还有食材，就不断进行
+    mainLoop: while (pool.length > 1) {
+      // 1. 掷出所有骰子
+      count++;
+
+      for (const die of pool) {
+        die.value = Math.floor(Math.random() * die.max) + 1;
+      }
+
+      // 2. 生成 terms 字符串: [甜味：4]，[苦味：6]
+      const terms = pool.map((d) => `[${d.flavor}：${d.value}]`).join("，");
+
+      // 3. 统计频次：按【点数】分组，收集所有掷出该点数的骰子
+      const countMap = new Map<
+        number,
+        { value: number; max: number; flavor: string }[]
+      >();
+      for (const die of pool) {
+        if (!countMap.has(die.value)) {
+          countMap.set(die.value, []);
+        }
+        countMap.get(die.value)!.push(die);
+      }
+
+      // 4. 找出所有出现次数 > 1 的点数
+      let roundScore = 0;
+      const matchingEntries = Array.from(countMap.entries()).filter(
+        ([_, diceList]) => diceList.length > 1,
+      );
+
+      let message = "";
+      if (matchingEntries.length > 0) {
+        // 【情况A】有相同点数：自动消除并直接进入下一轮
+        const listLines: string[] = [];
+
+        for (const [num, diceList] of matchingEntries) {
+          const groupItems = diceList
+            .map((die) => `[${die.flavor}:${num}]`)
+            .join(",");
+
+          // 相同数字是几点就加几分
+          roundScore += num;
+
+          listLines.push(`${groupItems}-->得分：${num}`);
+
+          // 从池中移除这些相同的骰子
+          for (const die of diceList) {
+            const index = pool.indexOf(die);
+            if (index !== -1) pool.splice(index, 1);
+          }
+        }
+
+        totalScore += roundScore;
+        const list = listLines.join("\n");
+
+        message = `大锅开始搅动......进行第${count}轮烹饪\n${terms}\n-----------\n 相同的点数是\n${list}\n-----------\n当前分数为：${totalScore}\n当前锅中还剩食材：${getRemainingIngredients(pool)}`;
+
+        await session.sendQueued(message, 3000);
+
+        // 如果锅里没食材了，直接结束循环
+        if (pool.length === 0) break;
+
+        // 直接进入下一轮掷骰子，不需要等待用户输入
+        continue;
+      } else {
+        // 无相同点数
+        message = `大锅开始搅动......进行第${count}轮烹饪\n${terms}\n-----------\n 没有相同的点数\n-----------\n当前分数为：${totalScore}\n当前锅中还剩食材：${getRemainingIngredients(pool)}\n-----------\n输入rm 味道来移除一颗骰子以进行下一次烹饪\n例：rm 甜味`;
+
+        await session.sendQueued(message, 3000);
+
+        // 如果锅里没食材了，直接结束循环
+        if (pool.length <= 2) break;
+
+        const dispose = session.middleware(({ content }, next) => {
+          const trimmed = content.trim();
+          // 只有严格符合 "rm xxx" 格式的消息才放行
+          if (/^rm\s+.+$/i.test(trimmed)) {
+            return next();
+          }
+        });
+        // 6. 等待用户输入 rm 指令
+        try {
+          while (true) {
+            const rmInput = await session.prompt();
+            if (!rmInput) {
+              await session.send("等待超时，锅烧糊啦！");
+              break mainLoop;
+            }
+
+            // 7. 解析用户的 rm 指令
+            const rmMatch = rmInput.trim().match(/^rm\s+(.+)$/i);
+            if (!rmMatch) {
+              await session.send("指令格式错误，请输入类似 'rm 甜味' 的指令");
+              continue;
+            }
+
+            const flavorToRemove = rmMatch[1];
+            const index = pool.findIndex((d) => d.flavor === flavorToRemove);
+            if (index === -1) {
+              await session.send(
+                `锅里没有找到 [${flavorToRemove}]，请重新输入！`,
+              );
+              continue;
+            }
+
+            // 8. 成功移除
+            pool.splice(index, 1);
+            await session.sendQueued(
+              `成功从锅中捞出了一颗 [${flavorToRemove}]，当前锅里剩余 ${pool.length} 份食材。`,
+              2000,
+            );
+            break;
+          }
+        } finally {
+          dispose();
+        }
+      }
+    }
+
+    return `烹饪结束！锅里已经空了，本次烹饪最终总分为：${totalScore}`;
+  });
+  //   let str = cook.replace(/\s+/g, "");
+  //   let terms = [];
+  //   try {
+  //     terms = parseFlavor(str);
+  //   } catch (error) {
+  //     ctx.logger.error(error.message);
+  //     session.send(error.message);
+  //     return;
+  //   }
+  //   console.log(terms);
+
+  //   session.send(`大锅开始搅动......\n${terms}`);
+  //   // cook = cook.replace(/\s+/g, "");
+  // });
+
+  function parseFlavor(
+    notation: string,
+  ): { value: number; max: number; flavor: string }[] {
+    if (!notation || typeof notation !== "string")
+      throw new Error("无效的输入格式");
+    const cleanStr = notation.replace(/\s+/g, "");
+    const pool: { value: number; max: number; flavor: string }[] = [];
+
+    const parts = cleanStr.split("+");
+    for (const part of parts) {
+      const match = part.match(/^(\d+)(.+)$/);
+      if (!match) throw new Error(`无法解析的食材格式: ${part}`);
+
+      const [, countStr, flavor] = match;
+      const count = parseInt(countStr, 10);
+      const diceType = Cook_Dict[flavor];
+
+      if (!diceType) throw new Error(`未知的味道类型: ${flavor}`);
+
+      const sides = parseInt(diceType.substring(1), 10);
+      for (let i = 0; i < count; i++) {
+        pool.push({ value: 0, max: sides, flavor });
+      }
+    }
+    return pool;
+  }
+
+  function getRemainingIngredients(pool: { flavor: string }[]): string {
+    if (pool.length === 0) return "无";
+
+    const flavorCountMap = new Map<string, number>();
+    for (const die of pool) {
+      flavorCountMap.set(die.flavor, (flavorCountMap.get(die.flavor) || 0) + 1);
+    }
+
+    return Array.from(flavorCountMap.entries())
+      .map(([flavor, count]) => `[${count}${flavor}]`)
+      .join("");
+  }
 
   // ctx
   //   .command("dd [values:text]", "掷二元骰")
@@ -105,11 +301,14 @@ export function commandDice(ctx: Context, config: Config) {
     if (!session) return "无法获取用户信息。";
     const prefixMatch = session.content.match(/^([。\.]ddr)/i);
     if (prefixMatch) {
-      const [hope, despair] = rollTwoDice(1);
+      const [hope, despair] = rollTwoDice();
       const result = hope + despair;
 
-      // 2. 提取前缀后的剩余字符串，并去除首尾空白
-      const rest = session.content.slice(prefixMatch[0].length).trimStart();
+      // 2. 提取前缀后的剩余字符串，并去除空白
+      const rest = session.content
+        .slice(prefixMatch[0].length)
+        .trimStart()
+        .replace(/\s+/g, "");
 
       // 3. 调用结果方程
       rollResult(rest, despair, hope, session, ctx, result, config, true);
@@ -123,18 +322,24 @@ export function commandDice(ctx: Context, config: Config) {
     const prefixMatch = session.content.match(/^([。\.]dd)/i);
     const prefixMatchR = session.content.match(/^([。\.]r)/i);
     if (prefixMatch) {
-      const [hope, despair] = rollTwoDice(1);
+      const [hope, despair] = rollTwoDice();
       const result = hope + despair;
 
-      // 2. 提取前缀后的剩余字符串，并去除首尾空白
-      const rest = session.content.slice(prefixMatch[0].length).trimStart();
+      // 2. 提取前缀后的剩余字符串，并去除空白
+      const rest = session.content
+        .slice(prefixMatch[0].length)
+        .trimStart()
+        .replace(/\s+/g, "");
 
       // 3. 调用结果方程
       rollResult(rest, despair, hope, session, ctx, result, config);
     }
     if (prefixMatchR) {
-      // 2. 提取前缀后的剩余字符串，并去除首尾空白
-      const rest = session.content.slice(prefixMatchR[0].length).trimStart();
+      // 2. 提取前缀后的剩余字符串，并去除空白
+      const rest = session.content
+        .slice(prefixMatchR[0].length)
+        .trimStart()
+        .replace(/\s+/g, "");
 
       // 3. 调用结果方程
       nomalRollResult(rest, session);
@@ -143,6 +348,10 @@ export function commandDice(ctx: Context, config: Config) {
   });
 }
 
+/** 解析骰子表达式
+ * @param term 骰子表达式
+ * @returns 解析结果
+ */
 function parseTerm(term: string): {
   type: "dice" | "number";
   count?: number;
@@ -175,14 +384,28 @@ function parseTerm(term: string): {
   throw new Error(`无效项: ${term}`);
 }
 
-// 二元骰 希望骰与恐惧骰
-function rollTwoDice(count: number): number[] {
+/** 二元骰 希望骰与恐惧骰
+ *
+ * @returns 希望骰与恐惧骰
+ */
+function rollTwoDice(): number[] {
   const hope = Math.floor(Math.random() * 12) + 1;
   const despair = Math.floor(Math.random() * 12) + 1;
   return [hope, despair];
 }
 
-// 掷骰结果方程
+/** 掷骰结果方程
+ * @param rest 剩余字符串
+ * @param despair 恐惧骰
+ * @param hope 希望骰
+ * @param session 会话对象
+ * @param ctx 上下文对象
+ * @param result 掷骰结果
+ * @param config 配置对象
+ * @param isPrepend 是否前置
+ * @returns
+ */
+
 async function rollResult(
   rest: string,
   despair: number,
@@ -247,68 +470,72 @@ async function rollResult(
     }
   };
 
-  if (isPrepend) {
+  if (rest === "") {
     if (hope > despair) {
-      session.send(
-        `${session.event.user.name} 掷出了它的命运，结果会是什么呢\n--------------------------------------------\n希望骰 ${hope}       与        恐惧骰 ${despair}\n-------------------------------------------\n      合计 ${result}         希望结果\n[反应掷骰]\n[命运的寄语]: ${hopeful(config)}      `,
-      );
-    } else if (hope < despair) {
-      session.send(
-        `${session.event.user.name} 掷出了它的命运，结果会是什么呢\n--------------------------------------------\n希望骰 ${hope}       与        恐惧骰 ${despair}\n-------------------------------------------\n      合计 ${result}         恐惧结果\n[反应掷骰]\n[命运的寄语]: ${desperate(config)}      `,
-      );
-    } else {
-      session.send(
-        `${session.event.user.name} 掷出了它的命运，结果会是什么呢\n--------------------------------------------\n希望骰 ${hope}        与        恐惧骰 ${despair} \n-------------------------------------------\n            关键成功!\n[反应掷骰]\n[命运的寄语]: ${wonderful(config)}      `,
-      );
-    }
-  } else if (rest === "") {
-    if (hope > despair) {
-      await ctx.database.set(
-        "playercharacter",
-        {
-          userid: user.id,
-          useable: true,
-          groupid: groupId,
-        },
-        (row) => ({
-          "hope.value": $.min([$.add(row.hope.value, 1), 6]),
-        }),
-      );
+      if (isPrepend) {
+        session.send(
+          `${session.event.user.name} 掷出了它的命运，结果会是什么呢\n--------------------------------------------\n希望骰 ${hope}       与        恐惧骰 ${despair}\n-------------------------------------------\n      合计 ${result}         希望结果\n[反应掷骰]\n[命运的寄语]: ${hopeful(config)}      `,
+        );
+      } else {
+        await ctx.database.set(
+          "playercharacter",
+          {
+            userid: user.id,
+            useable: true,
+            groupid: groupId,
+          },
+          (row) => ({
+            "hope.value": $.min([$.add(row.hope.value, 1), 6]),
+          }),
+        );
 
-      session.send(
-        `${session.event.user.name} 掷出了它的命运，结果会是什么呢\n--------------------------------------------\n希望骰 ${hope}       与        恐惧骰 ${despair}\n-------------------------------------------\n      合计 ${result}         希望结果\n[希望值变化]: ${hopeChange()} \n[命运的寄语]: ${hopeful(config)}      `,
-      );
+        session.send(
+          `${session.event.user.name} 掷出了它的命运，结果会是什么呢\n--------------------------------------------\n希望骰 ${hope}       与        恐惧骰 ${despair}\n-------------------------------------------\n      合计 ${result}         希望结果\n[希望值变化]: ${hopeChange()} \n[命运的寄语]: ${hopeful(config)}      `,
+        );
+      }
     } else if (hope < despair) {
-      await ctx.database.set(
-        "playercharacter",
-        {
-          rolename: "GM",
-          useable: true,
-          groupid: groupId,
-        },
-        (row) => ({
-          "fear.value": $.min([$.add(row.fear.value, 1), 12]),
-        }),
-      );
-      session.send(
-        `${session.event.user.name} 掷出了它的命运，结果会是什么呢\n--------------------------------------------\n希望骰 ${hope}       与        恐惧骰 ${despair}\n-------------------------------------------\n      合计 ${result}         恐惧结果\n[恐惧点变化]: ${fearChange()}\n[命运的寄语]: ${desperate(config)}      `,
-      );
+      if (isPrepend) {
+        session.send(
+          `${session.event.user.name} 掷出了它的命运，结果会是什么呢\n--------------------------------------------\n希望骰 ${hope}       与        恐惧骰 ${despair}\n-------------------------------------------\n      合计 ${result}         恐惧结果\n[反应掷骰]\n[命运的寄语]: ${desperate(config)}      `,
+        );
+      } else {
+        await ctx.database.set(
+          "playercharacter",
+          {
+            rolename: "GM",
+            useable: true,
+            groupid: groupId,
+          },
+          (row) => ({
+            "fear.value": $.min([$.add(row.fear.value, 1), 12]),
+          }),
+        );
+        session.send(
+          `${session.event.user.name} 掷出了它的命运，结果会是什么呢\n--------------------------------------------\n希望骰 ${hope}       与        恐惧骰 ${despair}\n-------------------------------------------\n      合计 ${result}         恐惧结果\n[恐惧点变化]: ${fearChange()}\n[命运的寄语]: ${desperate(config)}      `,
+        );
+      }
     } else {
-      await ctx.database.set(
-        "playercharacter",
-        {
-          userid: user.id,
-          useable: true,
-          groupid: groupId,
-        },
-        (row) => ({
-          "hope.value": $.min([$.add(row.hope.value, 1), 6]),
-          "stress.value": $.max([$.subtract(row.stress.value, 1), 0]),
-        }),
-      );
-      session.send(
-        `${session.event.user.name} 掷出了它的命运，结果会是什么呢\n--------------------------------------------\n希望骰 ${hope}        与        恐惧骰 ${despair} \n-------------------------------------------\n            关键成功！\n[希望值变化]: ${hopeChange()}\n[压力值变化]: ${stressChange()}\n[命运的寄语]: ${wonderful(config)}      `,
-      );
+      if (isPrepend) {
+        session.send(
+          `${session.event.user.name} 掷出了它的命运，结果会是什么呢\n--------------------------------------------\n希望骰 ${hope}        与        恐惧骰 ${despair} \n-------------------------------------------\n            关键成功!\n[反应掷骰]\n[命运的寄语]: ${wonderful(config)}      `,
+        );
+      } else {
+        await ctx.database.set(
+          "playercharacter",
+          {
+            userid: user.id,
+            useable: true,
+            groupid: groupId,
+          },
+          (row) => ({
+            "hope.value": $.min([$.add(row.hope.value, 1), 6]),
+            "stress.value": $.max([$.subtract(row.stress.value, 1), 0]),
+          }),
+        );
+        session.send(
+          `${session.event.user.name} 掷出了它的命运，结果会是什么呢\n--------------------------------------------\n希望骰 ${hope}        与        恐惧骰 ${despair} \n-------------------------------------------\n            关键成功！\n[希望值变化]: ${hopeChange()}\n[压力值变化]: ${stressChange()}\n[命运的寄语]: ${wonderful(config)}      `,
+        );
+      }
     }
   } else {
     const termRegex = /([+-]?)\s*(?:(\d*)d(\d+)|([^+-]+?))(?=\s*[+-]|$)/g;
@@ -391,55 +618,80 @@ async function rollResult(
     }
 
     if (hope > despair) {
-      await ctx.database.set(
-        "playercharacter",
-        {
-          userid: user.id,
-          useable: true,
-          groupid: groupId,
-        },
-        (row) => ({
-          "hope.value": $.min([$.add(row.hope.value, 1), 6]),
-        }),
-      );
-      session.send(
-        `${session.event.user.name} 掷出了它的命运，结果会是什么呢\n调整值: ${adjustments.join(",")}\n--------------------------------------------\n希望骰 ${hope}       与        恐惧骰 ${despair}\n-------------------------------------------\n      合计 ${result + total}       希望结果\n[希望值变化]: ${hopeChange()} \n[命运的寄语]: ${hopeful(config)}      `,
-      );
+      if (isPrepend) {
+        session.send(
+          `${session.event.user.name} 掷出了它的命运，结果会是什么呢\n调整值: ${adjustments.join(",")}\n--------------------------------------------\n希望骰 ${hope}       与        恐惧骰 ${despair}\n-------------------------------------------\n      合计 ${result + total}         希望结果\n[反应掷骰]\n[命运的寄语]: ${hopeful(config)}      `,
+        );
+      } else {
+        await ctx.database.set(
+          "playercharacter",
+          {
+            userid: user.id,
+            useable: true,
+            groupid: groupId,
+          },
+          (row) => ({
+            "hope.value": $.min([$.add(row.hope.value, 1), 6]),
+          }),
+        );
+        session.send(
+          `${session.event.user.name} 掷出了它的命运，结果会是什么呢\n调整值: ${adjustments.join(",")}\n--------------------------------------------\n希望骰 ${hope}       与        恐惧骰 ${despair}\n-------------------------------------------\n      合计 ${result + total}       希望结果\n[希望值变化]: ${hopeChange()} \n[命运的寄语]: ${hopeful(config)}      `,
+        );
+      }
     } else if (hope < despair) {
-      await ctx.database.set(
-        "playercharacter",
-        {
-          rolename: "GM",
-          useable: true,
-          groupid: groupId,
-        },
-        (row) => ({
-          "fear.value": $.min([$.add(row.fear.value, 1), 12]),
-        }),
-      );
-      session.send(
-        `${session.event.user.name} 掷出了它的命运，结果会是什么呢\n调整值: ${adjustments.join(",")}\n--------------------------------------------\n希望骰 ${hope}       与        恐惧骰 ${despair}\n-------------------------------------------\n      合计 ${result + total}       恐惧结果\n[恐惧点变化]: ${fearChange()}\n[命运的寄语]: ${desperate(config)}      `,
-      );
+      if (isPrepend) {
+        session.send(
+          `${session.event.user.name} 掷出了它的命运，结果会是什么呢\n调整值: ${adjustments.join(",")}\n--------------------------------------------\n希望骰 ${hope}       与        恐惧骰 ${despair}\n-------------------------------------------\n      合计 ${result + total}         恐惧结果\n[反应掷骰]\n[命运的寄语]: ${desperate(config)}      `,
+        );
+      } else {
+        await ctx.database.set(
+          "playercharacter",
+          {
+            rolename: "GM",
+            useable: true,
+            groupid: groupId,
+          },
+          (row) => ({
+            "fear.value": $.min([$.add(row.fear.value, 1), 12]),
+          }),
+        );
+        session.send(
+          `${session.event.user.name} 掷出了它的命运，结果会是什么呢\n调整值: ${adjustments.join(",")}\n--------------------------------------------\n希望骰 ${hope}       与        恐惧骰 ${despair}\n-------------------------------------------\n      合计 ${result + total}       恐惧结果\n[恐惧点变化]: ${fearChange()}\n[命运的寄语]: ${desperate(config)}      `,
+        );
+      }
     } else {
-      await ctx.database.set(
-        "playercharacter",
-        {
-          userid: user.id,
-          useable: true,
-          groupid: groupId,
-        },
-        (row) => ({
-          "hope.value": $.min([$.add(row.hope.value, 1), 6]),
-          "stress.value": $.max([$.subtract(row.stress.value, 1), 0]),
-        }),
-      );
-      session.send(
-        `${session.event.user.name} 掷出了它的命运，结果会是什么呢\n调整值: ${adjustments.join(",")}\n--------------------------------------------\n希望骰 ${hope}       与        恐惧骰 ${despair}\n-------------------------------------------\n           关键成功！\n[希望值变化]: ${hopeChange()}\n[压力值变化]: ${stressChange()}\n[命运的寄语]: ${wonderful(config)}      `,
-      );
+      if (isPrepend) {
+        session.send(
+          `${session.event.user.name} 掷出了它的命运，结果会是什么呢\n调整值: ${adjustments.join(",")}\n--------------------------------------------\n希望骰 ${hope}        与        恐惧骰 ${despair} \n-------------------------------------------\n            关键成功!\n[反应掷骰]\n[命运的寄语]: ${wonderful(config)}      `,
+        );
+      } else {
+        await ctx.database.set(
+          "playercharacter",
+          {
+            userid: user.id,
+            useable: true,
+            groupid: groupId,
+          },
+          (row) => ({
+            "hope.value": $.min([$.add(row.hope.value, 1), 6]),
+            "stress.value": $.max([$.subtract(row.stress.value, 1), 0]),
+          }),
+        );
+        session.send(
+          `${session.event.user.name} 掷出了它的命运，结果会是什么呢\n调整值: ${adjustments.join(",")}\n--------------------------------------------\n希望骰 ${hope}       与        恐惧骰 ${despair}\n-------------------------------------------\n           关键成功！\n[希望值变化]: ${hopeChange()}\n[压力值变化]: ${stressChange()}\n[命运的寄语]: ${wonderful(config)}      `,
+        );
+      }
     }
     // session.send(hope > 9 && "<div>欢迎回来，用户！</div>");
   }
 }
+
+/**
+ * 普通掷骰子结果
+ * @param values 骰子表达式
+ * @param session 会话对象
+ * @returns
+ */
 
 function nomalRollResult(values: string, session: Session) {
   const extraTypeStr =
@@ -495,6 +747,10 @@ function nomalRollResult(values: string, session: Session) {
 }
 
 // 正则匹配为骰子时的方法
+/** 正则匹配为骰子时的方法
+ * @param str 骰子表达式
+ * @returns 匹配结果
+ */
 function diceMatch(str: string): [string, number] | null {
   const match = str.match(/^([+-])((\d*)d(\d+)|(\d+))$/);
   if (match) {
@@ -521,7 +777,37 @@ function diceMatch(str: string): [string, number] | null {
   }
 }
 
-// 希望结果
+function parseFlavor(str: string) {
+  return str.split("+").map((item) => {
+    const match = item.match(/^(\d+)(.+)$/);
+    if (match) {
+      console.log(match);
+      const [, count, flavor] = match;
+      const diceType = Cook_Dict[flavor];
+      if (!diceType) {
+        throw new Error(`未知的味道类型: ${flavor}`);
+      }
+      return { [flavor]: `${count}${diceType}` };
+    } else {
+      throw new Error(`未知的味道类型: ${item}`);
+    }
+  });
+}
+
+function cookResult(cook: string) {
+  let result = "";
+  for (const char of cook) {
+    if (char in Cook_Dict) {
+      result += `${char}${Cook_Dict[char]} `;
+    }
+  }
+  return result;
+}
+
+/** 希望结果
+ * @param config 配置对象
+ * @returns 希望结果
+ */
 function hopeful(config: Config) {
   if (config.hopeResultText.length === 0) {
     return "";
@@ -532,7 +818,10 @@ function hopeful(config: Config) {
   }
 }
 
-// 恐惧结果
+/** 恐惧结果
+ * @param config 配置对象
+ * @returns 恐惧结果
+ */
 function desperate(config: Config) {
   if (config.despairResultText.length === 0) {
     return "";
@@ -543,7 +832,10 @@ function desperate(config: Config) {
   }
 }
 
-// 关键成功结果
+/** 关键成功结果
+ * @param config 配置对象
+ * @returns 关键成功结果
+ */
 function wonderful(config: Config) {
   if (config.wonderfulResultText.length === 0) {
     return "";
