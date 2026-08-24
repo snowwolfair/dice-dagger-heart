@@ -4,6 +4,7 @@ import { Config } from "../config";
 import { Property_Dict } from "../utiles/dict";
 import fs from "node:fs";
 import { resolveTemplatePath } from "../pathway";
+import { ensureEnabled } from "./commandGugu";
 
 type PuppeteerPage = Awaited<
   ReturnType<NonNullable<Context["puppeteer"]>["page"]>
@@ -44,6 +45,7 @@ export async function showPlayerPage(ctx: Context, session: any) {
 export function setBoard(ctx: Context) {
   ctx.command("showplayer  显示人物卡").action(async ({ session }, name) => {
     if (!session) return "无法获取用户信息。";
+    if (!(await ensureEnabled(ctx, session))) return;
     if (!ctx.puppeteer) {
       ctx.logger.error("没有开启 puppeteer 服务，无法生成图片。");
       return null;

@@ -3,9 +3,17 @@ import { Context } from "koishi";
 declare module "koishi" {
   interface Tables {
     playercharacter: playerCharacter;
+    gugustate: GuguState;
     // character: Character;
     // field: Field;
   }
+}
+
+/** 咕咕开关状态表：记录每个群是否启用响应 */
+export interface GuguState {
+  id: number;
+  groupid: string;
+  enabled: boolean;
 }
 
 export interface playerCharacter {
@@ -187,6 +195,23 @@ export async function createPlayerCharacterTable(ctx: Context) {
     },
     { autoInc: true },
   );
+}
+
+/** 建立咕咕状态表：groupid 唯一，记录每个群的启用状态 */
+export async function createGuguStateTable(ctx: Context) {
+  ctx.model.extend("gugustate", {
+    id: "unsigned",
+    groupid: "string",
+    enabled: {
+      type: "boolean",
+      initial: true,
+      nullable: false,
+    },
+  }, {
+    autoInc: true,
+    primary: "id",
+    unique: ["groupid"],
+  });
 }
 
 // export async function createFieldTable(ctx: Context) {

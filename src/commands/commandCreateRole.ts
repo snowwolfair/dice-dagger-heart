@@ -3,6 +3,7 @@ import {} from "koishi-plugin-puppeteer";
 import { Config } from "../config";
 import { Property_Dict } from "../utiles/dict";
 import { showPlayerPage } from "./commandBoard";
+import { ensureEnabled } from "./commandGugu";
 // import { Character } from "../database";
 
 export interface CreateRoleCommand {
@@ -38,6 +39,7 @@ export function setRole(ctx: Context) {
   // 设置名称
   ctx.command("pcnew [name] 设置名称").action(async ({ session }, name) => {
     if (!session) return "无法获取用户信息。";
+    if (!(await ensureEnabled(ctx, session))) return;
     console.log(session.event.user, session.user);
     const user = session.event.user;
     const groupId = session.guildId;
@@ -111,6 +113,7 @@ export function setRole(ctx: Context) {
 
   ctx.command("gm 设置主持人").action(async ({ session }) => {
     if (!session) return "无法获取用户信息。";
+    if (!(await ensureEnabled(ctx, session))) return;
     const user = session.event.user;
     const groupId = session.guildId;
 
@@ -161,6 +164,7 @@ export function setRole(ctx: Context) {
     .alias("pccg")
     .action(async ({ session }, name) => {
       if (!session) return "无法获取用户信息。";
+      if (!(await ensureEnabled(ctx, session))) return;
       if (!name) {
         session.send("请输入切换角色名称");
         return;
@@ -173,6 +177,7 @@ export function setRole(ctx: Context) {
     if (!session) return "无法获取用户信息。";
     const prefixMatch = session.content.match(/^([。\.]st)/i);
     if (prefixMatch) {
+      if (!(await ensureEnabled(ctx, session))) return next(); // 咕咕静默，放行给后续中间件
       // 2. 提取前缀后的剩余字符串，并去除首尾空白
       const rest = session.content.slice(prefixMatch[0].length).trimStart();
       const user = session.event.user;
@@ -349,6 +354,7 @@ export function setRole(ctx: Context) {
     .command("pcpc [name] 移除登场角色属性")
     .action(async ({ session }, name) => {
       if (!session) return "无法获取用户信息。";
+      if (!(await ensureEnabled(ctx, session))) return;
       const user = session.event.user;
       const groupId = session.guildId;
 
@@ -422,6 +428,7 @@ export function setRole(ctx: Context) {
     .command("pclist [flag] 列出所有角色")
     .action(async ({ session }, flag) => {
       if (!session) return "无法获取用户信息。";
+      if (!(await ensureEnabled(ctx, session))) return;
       const user = session.event.user;
       const groupId = session.guildId;
 
@@ -477,6 +484,7 @@ export function setRole(ctx: Context) {
     .alias("pcmv")
     .action(async ({ session }, name) => {
       if (!session) return "无法获取用户信息。";
+      if (!(await ensureEnabled(ctx, session))) return;
       console.log(session.event.user, session.user);
       const user = session.event.user;
       const groupId = session.guildId;
@@ -510,9 +518,10 @@ export function setRole(ctx: Context) {
     });
 
   ctx
-    .command("pcshow [name] 显示当前登场角色属性")
+    .command("pcattr [name] 显示当前登场角色属性")
     .action(async ({ session }, name) => {
       if (!session) return "无法获取用户信息。";
+      if (!(await ensureEnabled(ctx, session))) return;
       console.log(session.event.user, session.user);
       const user = session.event.user;
       const groupId = session.guildId;
