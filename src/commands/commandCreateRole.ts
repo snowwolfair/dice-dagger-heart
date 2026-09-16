@@ -4,6 +4,8 @@ import { Config } from "../config";
 import { Property_Dict } from "../utiles/dict";
 import { showPlayerPage } from "./commandBoard";
 import { ensureEnabled } from "./commandGugu";
+import { ensureRule } from "./commandRule";
+import { listenCommand } from "../utiles/listenCommand";
 // import { Character } from "../database";
 
 export interface CreateRoleCommand {
@@ -63,12 +65,9 @@ async function updateGroupCard(session: any, character: any) {
 
 export function setRole(ctx: Context) {
   // 设置名称
-  ctx
-    .command("pcnew [name] 设置名称")
-    .alias("nn")
-    .action(async ({ session }, name) => {
-      if (!session) return "无法获取用户信息。";
-      if (!(await ensureEnabled(ctx, session))) return;
+  listenCommand(ctx, ["pcnew", "nn"], async (session, args) => {
+      const name = args[0];
+      if (!(await ensureRule(ctx, session, "DH"))) return;
       console.log(session.event.user, session.user);
       const user = session.event.user;
       const groupId = session.guildId;
@@ -144,9 +143,8 @@ export function setRole(ctx: Context) {
       }
     });
 
-  ctx.command("gm 设置主持人").action(async ({ session }) => {
-    if (!session) return "无法获取用户信息。";
-    if (!(await ensureEnabled(ctx, session))) return;
+  listenCommand(ctx, "gm", async (session) => {
+    if (!(await ensureRule(ctx, session, "DH"))) return;
     const user = session.event.user;
     const groupId = session.guildId;
 
@@ -200,12 +198,9 @@ export function setRole(ctx: Context) {
   });
 
   // 切换当前登场角色
-  ctx
-    .command("pcswitch [name] 切换当前登场角色")
-    .alias("pccg")
-    .action(async ({ session }, name) => {
-      if (!session) return "无法获取用户信息。";
-      if (!(await ensureEnabled(ctx, session))) return;
+  listenCommand(ctx, ["pcswitch", "pccg"], async (session, args) => {
+      const name = args[0];
+      if (!(await ensureRule(ctx, session, "DH"))) return;
       if (!name) {
         session.send("请输入切换角色名称");
         return;
@@ -218,7 +213,8 @@ export function setRole(ctx: Context) {
     if (!session) return "无法获取用户信息。";
     const prefixMatch = session.content.match(/^([。\.]st)/i);
     if (prefixMatch) {
-      if (!(await ensureEnabled(ctx, session))) return next(); // 咕咕静默，放行给后续中间件
+      if (!(await ensureEnabled(ctx, session))) return; // 咕咕关闭，静默吞掉
+      if (!(await ensureRule(ctx, session, "DH"))) return next(); // 规则不匹配，放行给后续中间件
       // 2. 提取前缀后的剩余字符串，并去除首尾空白
       const rest = session.content.slice(prefixMatch[0].length).trimStart();
       const user = session.event.user;
@@ -387,11 +383,9 @@ export function setRole(ctx: Context) {
   });
 
   // 移除登场角色属性
-  ctx
-    .command("pcpc [name] 移除登场角色属性")
-    .action(async ({ session }, name) => {
-      if (!session) return "无法获取用户信息。";
-      if (!(await ensureEnabled(ctx, session))) return;
+  listenCommand(ctx, "pcpc", async (session, args) => {
+      const name = args[0];
+      if (!(await ensureRule(ctx, session, "DH"))) return;
       const user = session.event.user;
       const groupId = session.guildId;
 
@@ -461,11 +455,9 @@ export function setRole(ctx: Context) {
     });
 
   // 列出所有角色
-  ctx
-    .command("pclist [flag] 列出所有角色")
-    .action(async ({ session }, flag) => {
-      if (!session) return "无法获取用户信息。";
-      if (!(await ensureEnabled(ctx, session))) return;
+  listenCommand(ctx, "pclist", async (session, args) => {
+      const flag = args[0];
+      if (!(await ensureRule(ctx, session, "DH"))) return;
       const user = session.event.user;
       const groupId = session.guildId;
 
@@ -516,12 +508,9 @@ export function setRole(ctx: Context) {
       }
     });
 
-  ctx
-    .command("pcremove [name] 移除登场角色")
-    .alias("pcmv")
-    .action(async ({ session }, name) => {
-      if (!session) return "无法获取用户信息。";
-      if (!(await ensureEnabled(ctx, session))) return;
+  listenCommand(ctx, ["pcremove", "pcmv"], async (session, args) => {
+      const name = args[0];
+      if (!(await ensureRule(ctx, session, "DH"))) return;
       console.log(session.event.user, session.user);
       const user = session.event.user;
       const groupId = session.guildId;
@@ -554,11 +543,9 @@ export function setRole(ctx: Context) {
       session.send(`${name} 在舞台上谢幕了`);
     });
 
-  ctx
-    .command("pcattr [name] 显示当前登场角色属性")
-    .action(async ({ session }, name) => {
-      if (!session) return "无法获取用户信息。";
-      if (!(await ensureEnabled(ctx, session))) return;
+  listenCommand(ctx, "pcattr", async (session, args) => {
+      const name = args[0];
+      if (!(await ensureRule(ctx, session, "DH"))) return;
       console.log(session.event.user, session.user);
       const user = session.event.user;
       const groupId = session.guildId;

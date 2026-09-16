@@ -3,17 +3,20 @@ import { Context } from "koishi";
 declare module "koishi" {
   interface Tables {
     playercharacter: playerCharacter;
-    gugustate: GuguState;
+    groupstate: GroupState;
+    dicelog: DiceLog;
+    dicelogline: DiceLogLine;
     // character: Character;
     // field: Field;
   }
 }
 
-/** 咕咕开关状态表：记录每个群是否启用响应 */
-export interface GuguState {
+/** 群状态表：合并记录每个群的咕咕开关与当前规则集 */
+export interface GroupState {
   id: number;
   groupid: string;
   enabled: boolean;
+  rulename: string;
 }
 
 export interface playerCharacter {
@@ -197,9 +200,9 @@ export async function createPlayerCharacterTable(ctx: Context) {
   );
 }
 
-/** 建立咕咕状态表：groupid 唯一，记录每个群的启用状态 */
-export async function createGuguStateTable(ctx: Context) {
-  ctx.model.extend("gugustate", {
+/** 建立群状态表：groupid 唯一，合并记录咕咕开关与当前规则集 */
+export async function createGroupStateTable(ctx: Context) {
+  ctx.model.extend("groupstate", {
     id: "unsigned",
     groupid: "string",
     enabled: {
@@ -207,10 +210,107 @@ export async function createGuguStateTable(ctx: Context) {
       initial: true,
       nullable: false,
     },
+    rulename: {
+      type: "string",
+      initial: "DH",
+      nullable: false,
+    },
   }, {
     autoInc: true,
     primary: "id",
     unique: ["groupid"],
+  });
+}
+
+// ==================== 跑团日志表 ====================
+
+/** 日志会话状态：recording=记录中, paused=暂停, ended=已结束 */
+export type LogStatus = "recording" | "paused" | "ended";
+
+/** 日志会话表：一个群可同时有一个活跃会话 */
+export interface DiceLog {
+  id: number;
+  groupid: string;
+  logname: string;
+  userid: string;
+  status: string;  // LogStatus
+  starttime: number;
+  endtime: number;
+}
+
+/** 日志条目表：记录会话期间每条消息（玩家发言、机器人回复、系统事件、OOC） */
+export interface DiceLogLine {
+  id: number;
+  groupid: string;
+  logname: string;
+  username: string;    // 发送者名称
+  userid: string;      // 发送者平台 ID（如 QQ 号）
+  content: string;     // 消息纯文本内容
+  timestamp: number;
+  type: string;  // "player" | "result" | "system" | "ooc"
+}
+
+/** 建立日志会话表 */
+export async function createDiceLogTable(ctx: Context) {
+  ctx.model.extend("dicelog", {
+    id: "unsigned",
+    groupid: "string",
+    logname: "string",
+    userid: "string",
+    status: {
+      type: "string",
+      initial: "recording",
+      nullable: false,
+    },
+    starttime: {
+      type: "integer",
+      initial: 0,
+      nullable: false,
+    },
+    endtime: {
+      type: "integer",
+      initial: 0,
+      nullable: false,
+    },
+  }, {
+    autoInc: true,
+    primary: "id",
+  });
+}
+
+/** 建立日志条目表 */
+export async function createDiceLogLineTable(ctx: Context) {
+  ctx.model.extend("dicelogline", {
+    id: "unsigned",
+    groupid: "string",
+    logname: "string",
+    username: {
+      type: "string",
+      initial: "",
+      nullable: false,
+    },
+    userid: {
+      type: "string",
+      initial: "",
+      nullable: false,
+    },
+    content: {
+      type: "text",
+      nullable: false,
+    },
+    timestamp: {
+      type: "integer",
+      initial: 0,
+      nullable: false,
+    },
+    type: {
+      type: "string",
+      initial: "result",
+      nullable: false,
+    },
+  }, {
+    autoInc: true,
+    primary: "id",
   });
 }
 
