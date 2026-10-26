@@ -11,6 +11,7 @@ import { setBoard } from "./commands/commandBoard";
 import { setGugu } from "./commands/commandGugu";
 import { setRule } from "./commands/commandRule";
 import { setLog } from "./commands/commandLog";
+import { setHelp } from "./commands/commandHelp";
 import { DiceCoreService, DiceSystemConfig } from "./types";
 import { registerDiceSystem } from "./diceCore";
 import { registerRule } from "./utiles/rules";
@@ -197,7 +198,8 @@ export async function apply(ctx: Context, config: Config) {
   setRole(ctx);
   setGugu(ctx);
   setRule(ctx);
+  setHelp(ctx);
 
-  // 跑团日志（所有规则通用，不受 gugu/规则限制）
+  // 跑团日志（所有规则通用，受 gugu 守卫）
   setLog(ctx);
 }

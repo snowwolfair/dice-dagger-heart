@@ -12,22 +12,29 @@ export interface ListenCommandOptions {
   prepend?: boolean;
   /** 为 false 时不匹配前导 . / 。（避免 r 与 .r 重复处理） */
   dottedPrefix?: boolean;
+  /** 必须带 . 或 。 前缀才匹配（如 .cook / 。cook） */
+  requireDot?: boolean;
 }
 
 function escapeRegExp(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-/** 匹配指令名：可选前缀 . / 。，其后须为词边界 */
+/** 匹配指令名：默认可选前缀 . / 。；requireDot 时必须带 . 或 。 */
 export function matchCommand(
   content: string,
   names: string[],
   dottedPrefix = true,
+  requireDot = false,
 ): { name: string; rest: string } | null {
   const trimmed = (content || "").trim();
   if (!trimmed) return null;
   const namePat = names.map(escapeRegExp).join("|");
-  const prefix = dottedPrefix ? "(?:[./。])?" : "(?:/)?";
+  const prefix = requireDot
+    ? "[。.]"
+    : dottedPrefix
+      ? "(?:[./。])?"
+      : "(?:/)?";
   const re = new RegExp(`^${prefix}(${namePat})(?=\\s|$)`, "i");
   const m = trimmed.match(re);
   if (!m) return null;
@@ -49,11 +56,17 @@ export function listenCommand(
 ): void {
   const nameList = Array.isArray(names) ? names : [names];
   const dottedPrefix = options.dottedPrefix !== false;
+  const requireDot = options.requireDot === true;
   const prepend = options.prepend !== false;
 
   ctx.middleware(async (session, next) => {
     if (!session) return next();
-    const matched = matchCommand(session.content || "", nameList, dottedPrefix);
+    const matched = matchCommand(
+      session.content || "",
+      nameList,
+      dottedPrefix,
+      requireDot,
+    );
     if (!matched) return next();
 
     if (!(await ensureEnabled(ctx, session))) return;

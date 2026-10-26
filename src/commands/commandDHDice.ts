@@ -7,7 +7,10 @@ import { listenCommand } from "../utiles/listenCommand";
 
 /** 注册 DH 烹饪指令（中间件）。二元骰（.dd/.ddr）已由基底的 registerDiceSystem 接管。 */
 export function registerDHDice(ctx: Context) {
-  listenCommand(ctx, "cook", async (session) => {
+  listenCommand(
+    ctx,
+    "cook",
+    async (session) => {
     if (!(await ensureRule(ctx, session, "DH"))) return;
 
     await session.send(
@@ -131,7 +134,9 @@ export function registerDHDice(ctx: Context) {
     }
 
     return `烹饪结束！锅里已经空了，本次烹饪最终总分为：${totalScore}`;
-  });
+    },
+    { requireDot: true },
+  );
 }
 
 // ==================== 烹饪机制辅助 ====================
